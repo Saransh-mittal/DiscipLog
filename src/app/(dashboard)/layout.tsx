@@ -1,26 +1,114 @@
+import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
+import { TooltipProvider } from "@/components/ui/tooltip";
+import ThemeToggle from "@/components/ThemeToggle";
+import DashboardNav from "@/components/DashboardNav";
+
+function getGreeting(): string {
+  const hour = new Date().getHours();
+  if (hour < 12) return "Good morning";
+  if (hour < 17) return "Good afternoon";
+  if (hour < 21) return "Good evening";
+  return "Burning the midnight oil";
+}
+
+function getInitials(name: string | undefined | null): string {
+  if (!name) return "?";
+  return name
+    .split(" ")
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2);
+}
 
 export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
   const session = await getServerSession(authOptions);
-  
+
   if (!session) {
     redirect("/api/auth/signin");
   }
 
+  const greeting = getGreeting();
+  const firstName = session.user?.name?.split(" ")[0] || "there";
+
   return (
-    <div className="flex flex-col min-h-screen bg-zinc-950 text-zinc-50 font-sans selection:bg-indigo-500/30">
-      <header className="px-6 py-4 border-b border-white/10 flex justify-between items-center bg-zinc-900/50 backdrop-blur-xl sticky top-0 z-50">
-        <h2 className="text-xl font-bold tracking-tight bg-gradient-to-r from-white to-zinc-400 bg-clip-text text-transparent">DiscipLog</h2>
-        <div className="flex items-center gap-6">
-          <span className="text-sm font-medium text-zinc-400">{session.user?.email}</span>
-          <a href="/api/auth/signout" className="text-sm font-semibold text-rose-400 hover:text-rose-300 transition-colors">Logout</a>
-        </div>
-      </header>
-      <main className="flex-1 p-6 md:p-12 max-w-7xl mx-auto w-full relative">
-        {children}
-      </main>
-    </div>
+    <TooltipProvider>
+      <div className="v2 flex min-h-screen flex-col selection:bg-[oklch(0.65_0.19_60_/_30%)]">
+        <div className="v2-accent-line w-full" />
+
+        <header
+          className="sticky top-0 z-50 border-b px-6 py-3 md:px-10"
+          style={{
+            borderColor: "var(--v2-border)",
+            background: "var(--v2-surface)",
+            backdropFilter: "blur(20px)",
+          }}
+        >
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-6">
+              <h2
+                className="text-lg font-bold tracking-tight"
+                style={{ fontFamily: "var(--font-display)" }}
+              >
+                Discip<span style={{ color: "var(--v2-amber-400)" }}>Log</span>
+              </h2>
+
+              <DashboardNav />
+            </div>
+
+            <div className="flex items-center gap-3">
+              <span
+                className="hidden text-sm md:block"
+                style={{ color: "var(--v2-text-muted)" }}
+              >
+                {greeting},{" "}
+                <span className="font-semibold" style={{ color: "var(--v2-amber-400)" }}>
+                  {firstName}
+                </span>
+              </span>
+
+              <ThemeToggle />
+
+              <Avatar className="h-8 w-8 border" style={{ borderColor: "var(--v2-border-strong)" }}>
+                <AvatarImage src={session.user?.image || ""} alt={session.user?.name || "User"} />
+                <AvatarFallback
+                  className="text-xs font-bold"
+                  style={{
+                    background: "var(--v2-surface-raised)",
+                    color: "var(--v2-amber-400)",
+                    fontFamily: "var(--font-display)",
+                  }}
+                >
+                  {getInitials(session.user?.name)}
+                </AvatarFallback>
+              </Avatar>
+
+              <Button
+                asChild
+                variant="ghost"
+                size="sm"
+                className="text-xs font-semibold tracking-wide"
+                style={{ color: "var(--v2-rose-400)", fontFamily: "var(--font-body)" }}
+              >
+                <Link href="/api/auth/signout">
+                  Logout
+                </Link>
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <main className="relative mx-auto flex-1 w-full max-w-6xl px-6 py-8 md:px-10 md:py-10">
+          {children}
+        </main>
+
+        <div className="v2-accent-line mt-auto w-full" />
+      </div>
+    </TooltipProvider>
   );
 }

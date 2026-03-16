@@ -1,15 +1,20 @@
 # DiscipLog Architecture
 
 ## Overview
-DiscipLog is a robust discipline-logging application designed to be scalable, responsive, and seamless across platforms, relying on artificial intelligence to contextualize time spent.
+DiscipLog is a robust discipline-logging application designed to be scalable, responsive, and seamless across platforms, relying on artificial intelligence to contextualize time spent. The V2 dashboard is a multi-page application (Overview, Log, History) that supports direct manual logs, in-app eggtimer-style sprint sessions, and post-save log management (edit, regenerate summary, and delete), with all flows converging into the same persisted log model.
 
 ## Core Stack
-- **Framework:** Next.js 14 (App Router) + TypeScript
+- **Framework:** Next.js 16 (App Router) + TypeScript
 - **Styling:** Tailwind CSS + shadcn/ui
 - **Database:** MongoDB (via Mongoose)
 - **Auth:** NextAuth (Auth.js) via Google OAuth
-- **AI Analytics:** OpenAI API server-side
+- **AI Analytics:** OpenAI (`gpt-5-nano`) server-side
+- **UI/UX:** V2 Minimal Typographic design system (Light/Dark themes via `ThemeProvider`)
 - **Deployment:** Docker (Next.js Standalone mode for Railway)
+
+## Environment
+- `OPENAI_API_KEY` powers both the shared log summarization helper and the AI assistant chat endpoint.
+- MongoDB and NextAuth configuration remain unchanged.
 
 ## Philosophy & Stateless Design
 ### What does it mean to be "Stateless"?
@@ -36,3 +41,15 @@ Instead of failing silently to standard Next.js 500 pages, errors are ingested i
 - `docs/components.md` - Tracks the purpose of shared atomic elements.
 - `docs/api.md` - Schema design and routing.
 - `docs/oauth-setup.md` - Tutorial for adding Google OAuth keys.
+
+## Current Logging Flow
+1. On the `/dashboard/log` page, users can either create a manual log through `LoggerV2` or run a timed focus block through `SprintTimerCard`.
+2. Sprint state is managed client-side for responsiveness and refresh recovery, while persistence still happens only once the user finishes the sprint and submits their notes.
+3. Both flows call the shared summarization route, then save into the same `LogEntry` collection.
+4. When logs are created or edited, the server stores a canonical UTC `loggedAt` timestamp and derives the `date` bucket from the caller's timezone so local-day widgets remain consistent for the user.
+5. The V2 history feed (on `/dashboard/history`) exposes a dedicated editor modal that can update duration, transcript, AI summary, and timestamp; regenerate draft summaries; and permanently delete user-owned logs.
+6. Downstream dashboard systems such as progress widgets, history, heatmap, and AI coaching consume the unified log stream rather than separate manual-vs-sprint stores.
+
+## Shared Helpers
+- `src/lib/log-summary.ts` centralizes the OpenAI summarization prompt used by `/api/summarize` and `/api/logs/[id]/summary`.
+- `src/lib/logs.ts` centralizes log enums plus timezone/date helpers such as `deriveLogDate`, `formatLocalDate`, and `sortLogsByTimestamp`.

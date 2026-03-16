@@ -1,13 +1,13 @@
 import type { Metadata } from "next";
-import { Inter, Geist } from "next/font/google";
+import { Geist } from "next/font/google";
 import "./globals.css";
+import "./globals-v2.css";
 import AuthProvider from "@/components/AuthProvider";
-import { GlobalErrorBoundary } from "@/components/GlobalErrorBoundary";
+import { GlobalErrorBoundaryV2 } from "@/components/GlobalErrorBoundaryV2";
+import { ThemeProvider } from "@/components/ThemeProvider";
 import { cn } from "@/lib/utils";
 
-const geist = Geist({subsets:['latin'],variable:'--font-sans'});
-
-const inter = Inter({ subsets: ["latin"] });
+const geist = Geist({ subsets: ["latin"], variable: "--font-sans" });
 
 export const metadata: Metadata = {
   title: "DiscipLog",
@@ -20,12 +20,14 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={cn("dark", "font-sans", geist.variable)}>
-      <body className={`${inter.className} min-h-screen bg-background text-foreground antialiased`}>
+    <html lang="en" className={cn("dark", "font-sans", geist.variable)} suppressHydrationWarning>
+      <body className="min-h-screen bg-background text-foreground antialiased">
         <AuthProvider>
-          <GlobalErrorBoundary>
-            {children}
-          </GlobalErrorBoundary>
+          <ThemeProvider>
+            <GlobalErrorBoundaryV2>
+              {children}
+            </GlobalErrorBoundaryV2>
+          </ThemeProvider>
         </AuthProvider>
       </body>
     </html>

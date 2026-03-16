@@ -1,6 +1,17 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import connectToDatabase from "@/lib/mongoose";
+import ErrorLog from "@/models/ErrorLog";
 import { authOptions } from "../auth/[...nextauth]/route";
+import { generateLogSummary } from "@/lib/log-summary";
+
+function getErrorMessage(error: unknown) {
+  return error instanceof Error ? error.message : "Unknown summarize error";
+}
+
+function getErrorStack(error: unknown) {
+  return error instanceof Error ? error.stack : undefined;
+}
 
 export async function POST(req: Request) {
   try {
@@ -15,59 +26,49 @@ export async function POST(req: Request) {
       return new NextResponse("Missing text", { status: 400 });
     }
 
-    const prompt = `You are a productivity assistant summarizing a voice log for the category: "${category}".
-    Create a highly concise, bulleted summary of this work (max 3 bullets). Avoid intro/outro text.
-    Transcript: "${text}"`;
-
-    const response = await fetch("https://api.sarvam.ai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "api-subscription-key": process.env.SARVAM_API_KEY || "",
-      },
-      body: JSON.stringify({
-        model: "sarvam-105b",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
-        max_tokens: 150,
-      }),
-    });
-
-    if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Sarvam AI API Error: ${response.status} ${errText}`);
-    }
-
-    const data = await response.json();
-    const summary = data.choices[0].message.content?.trim();
+    const summary = await generateLogSummary({ text, category });
 
     return NextResponse.json({ summary });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error("[SUMMARIZE_ERROR]", error);
 
     // Centralized Error Logging Sink
     try {
-      const { getServerSession } = require("next-auth");
-      const { authOptions } = require("../auth/[...nextauth]/route");
       const session = await getServerSession(authOptions);
-
-      const connectToDatabase = require("@/lib/mongoose").default;
-      const ErrorLog = require("@/models/ErrorLog").default;
       await connectToDatabase();
       await ErrorLog.create({
-        environment: process.env.NODE_ENV || 'unknown',
-        context: "Server-SummarizeAPI-SarvamAI",
-        errorMessage: error?.message || "Unknown Sarvam AI Summarize error",
-        stackTrace: process.env.NODE_ENV === 'development' ? error?.stack : "Hidden in production",
-        userId: session?.user ? (session.user as any).id : undefined,
+        environment: process.env.NODE_ENV || "unknown",
+        context: "Server-SummarizeAPI",
+        errorMessage: getErrorMessage(error),
+        stackTrace:
+          process.env.NODE_ENV === "development"
+            ? getErrorStack(error)
+            : "Hidden in production",
+        userId: session?.user
+          ? (session.user as { id?: string }).id
+          : undefined,
       });
     } catch (loggingError) {
       console.error("Failed to log summarize error to database", loggingError);
     }
 
+    if (
+      getErrorMessage(error).includes("insufficient_quota") ||
+      (typeof error === "object" &&
+        error !== null &&
+        "code" in error &&
+        error.code === "insufficient_quota") ||
+      (typeof error === "object" &&
+        error !== null &&
+        "type" in error &&
+        error.type === "insufficient_quota")
+    ) {
+      return new NextResponse("Service unavailable: OpenAI quota exceeded. Please check billing details.", { status: 503 });
+    }
+
     // Environment aware response
-    if (process.env.NODE_ENV === 'development') {
-      return new NextResponse(error.stack || "Internal Error", { status: 500 });
+    if (process.env.NODE_ENV === "development") {
+      return new NextResponse(getErrorStack(error) || "Internal Error", { status: 500 });
     }
     return new NextResponse("An anomaly occurred while summarizing.", { status: 500 });
   }
