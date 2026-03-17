@@ -1,6 +1,5 @@
 import { generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
-import { isValidLogCategory } from "@/lib/logs";
 
 interface GenerateLogSummaryInput {
   text: string;
@@ -15,7 +14,7 @@ export async function generateLogSummary({
     throw new Error("Missing text");
   }
 
-  if (!isValidLogCategory(category)) {
+  if (!category || !category.trim()) {
     throw new Error("Invalid category");
   }
 

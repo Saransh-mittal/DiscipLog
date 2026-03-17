@@ -21,7 +21,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { LOG_CATEGORIES } from "@/lib/logs";
+import { useCategoriesContext } from "@/components/CategoriesProvider";
+import DynamicIcon from "@/components/DynamicIcon";
 
 interface EditableLog {
   _id: string;
@@ -61,6 +62,7 @@ export default function LogEditorDialog({
   onOpenChange,
   onSaved,
 }: LogEditorDialogProps) {
+  const { categories: userCategories } = useCategoriesContext();
   const [hours, setHours] = useState(String(log.hours));
   const [category, setCategory] = useState(log.category);
   const [loggedAt, setLoggedAt] = useState(
@@ -234,9 +236,9 @@ export default function LogEditorDialog({
                       color: "var(--v2-text-primary)",
                     }}
                   >
-                    {LOG_CATEGORIES.map((item) => (
-                      <SelectItem key={item} value={item}>
-                        {item}
+                    {userCategories.map((cat) => (
+                      <SelectItem key={cat.name} value={cat.name}>
+                        {cat.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

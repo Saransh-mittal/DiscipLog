@@ -7,6 +7,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview" },
   { href: "/dashboard/log", label: "Log" },
   { href: "/dashboard/history", label: "History" },
+  { href: "/dashboard/settings", label: "Settings" },
 ];
 
 export default function DashboardNav() {

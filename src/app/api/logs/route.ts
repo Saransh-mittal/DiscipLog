@@ -6,7 +6,6 @@ import ErrorLog from "@/models/ErrorLog";
 import LogEntry from "@/models/LogEntry";
 import {
   deriveLogDate,
-  isValidLogCategory,
   isValidLogSource,
   isValidSprintCompletionStatus,
   isValidTimezone,
@@ -50,7 +49,7 @@ export async function POST(req: Request) {
       typeof rawTranscript !== "string" ||
       !rawTranscript.trim() ||
       typeof category !== "string" ||
-      !isValidLogCategory(category) ||
+      !category.trim() ||
       typeof source !== "string" ||
       !isValidLogSource(source)
     ) {

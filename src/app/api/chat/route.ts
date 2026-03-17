@@ -3,6 +3,10 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "../auth/[...nextauth]/route";
 import { streamText, smoothStream } from "ai";
 import { openai } from "@ai-sdk/openai";
+import connectToDatabase from "@/lib/mongoose";
+import User from "@/models/User";
+import Commitment from "@/models/Commitment";
+import { formatLocalDate, getWeekStart } from "@/lib/logs";
 
 interface LogEntry {
   date: string;
@@ -14,23 +18,41 @@ interface LogEntry {
   createdAt: string;
 }
 
-function buildSystemPrompt(logs: LogEntry[], timezone: string): string {
-  // Weekly targets
-  const targets = `Weekly Targets:
-- Interview Prep: 15–20 hrs/week
-- Building: 10–12 hrs/week
-- Learning: 6–7 hrs/week
-- Shipping: No strict target (bonus/cherry on top)`;
+interface UserCategory {
+  name: string;
+  dailyTargetHours: number;
+  weeklyMinTarget: number;
+  weeklyMaxTarget: number;
+}
+
+async function buildSystemPrompt(
+  logs: LogEntry[],
+  timezone: string,
+  userId: string
+): Promise<string> {
+  // Fetch user's categories & commitments from DB
+  await connectToDatabase();
+  const user = await User.findById(userId).lean();
+  const weekStartDate = getWeekStart();
+  const weekStartStr = formatLocalDate(weekStartDate);
+  const commitments = await Commitment.find({
+    userId,
+    weekStart: weekStartStr,
+  }).lean();
+
+  // Build dynamic targets from user categories
+  const categories: UserCategory[] = user?.categories || [];
+  const targets = categories.length > 0
+    ? `Weekly Targets:\n${categories
+        .map(
+          (c: UserCategory) =>
+            `- ${c.name}: ${c.weeklyMinTarget}–${c.weeklyMaxTarget} hrs/week (daily target: ${c.dailyTargetHours}h)`
+        )
+        .join("\n")}`
+    : "No categories configured yet.";
 
   // Compute weekly category breakdown
   const now = new Date();
-  const day = now.getDay();
-  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
-  const weekStart = new Date(now);
-  weekStart.setDate(diff);
-  weekStart.setHours(0, 0, 0, 0);
-  const weekStartStr = weekStart.toISOString().split("T")[0];
-
   const weeklyHours: Record<string, number> = {};
   const todayStr = now.toISOString().split("T")[0];
   let todayTotal = 0;
@@ -46,7 +68,7 @@ function buildSystemPrompt(logs: LogEntry[], timezone: string): string {
     }
   });
 
-  // Last 10 logs as context (include exact time in user's timezone)
+  // Last 10 logs as context
   const recent = logs.slice(0, 10);
   recent.forEach((log) => {
     let time = "unknown time";
@@ -76,6 +98,16 @@ function buildSystemPrompt(logs: LogEntry[], timezone: string): string {
     .map(([cat, hrs]) => `  ${cat}: ${hrs}h`)
     .join("\n");
 
+  // Commitments context
+  const commitmentLines = commitments.length > 0
+    ? commitments
+        .map(
+          (c: any) =>
+            `- "${c.text}" — Status: ${c.status}${c.missedReason ? ` (reason: ${c.missedReason})` : ""}`
+        )
+        .join("\n")
+    : "No commitments this week.";
+
   return `You are DiscipLog AI — a direct, no-nonsense productivity coach for a software engineer.
 You have full context on their logged work sessions.
 
@@ -85,6 +117,9 @@ This Week's Progress (since ${weekStartStr}):
 ${weekSummary || "  No logs yet this week."}
 
 Today's total: ${todayTotal}h
+
+Weekly Commitments:
+${commitmentLines}
 
 Recent Log Entries:
 ${recentLogs.length > 0 ? recentLogs.join("\n") : "No entries yet."}
@@ -96,10 +131,11 @@ Rules:
 - Be concise, direct, and actionable. Avoid generic fluff.
 - Reference their actual logged data (hours, categories, and summaries) when giving advice.
 - **Tone:** You are a strict but fair coach. Balance "tough love" with genuine encouragement.
-- **Quality over Quantity (CRITICAL):** You MUST read the 'Summary' for their logs. If a log is very short (e.g., 0.2h) but the summary implies highly dense, technical, or complex work (like architectural design, complex logic, or deep research), you MUST acknowledge and praise the extraordinary depth and quality of that sprint BEFORE mentioning any time deficit. It IS extraordinary to write complex technical specs in x minutes.
+- **Quality over Quantity (CRITICAL):** You MUST read the 'Summary' for their logs. If a log is very short (e.g., 0.2h) but the summary implies highly dense, technical, or complex work (like architectural design, complex logic, or deep research), you MUST acknowledge and praise the extraordinary depth and quality of that sprint BEFORE mentioning any time deficit.
 - If they're behind on a category, call it out specifically with the gap, but offer a realistic next step.
 - Give time-boxed suggestions when relevant (e.g., "Spend the next 2 hours on Interview Prep to close the gap").
-- When asked about patterns, analyze their logging timestamps and category distribution.`;
+- When asked about patterns, analyze their logging timestamps and category distribution.
+- Reference their weekly commitments when relevant — if they committed to ship something, ask about progress or acknowledge completion.`;
 }
 
 export async function POST(req: Request) {
@@ -109,15 +145,20 @@ export async function POST(req: Request) {
       return new NextResponse("Unauthorized", { status: 401 });
     }
 
+    const userId = (session.user as { id: string }).id;
     const { messages, logs, timezone } = await req.json();
 
     const userTimezone = timezone || "Asia/Kolkata";
-    const systemPrompt = buildSystemPrompt(logs || [], userTimezone);
+    const systemPrompt = await buildSystemPrompt(
+      logs || [],
+      userTimezone,
+      userId
+    );
 
-    // Map UI messages from useChat to ModelMessages that streamText expects
     const coreMessages = messages.map((m: any) => ({
       role: m.role,
-      content: m.content || m.parts?.map((p: any) => p.text || "").join("") || "",
+      content:
+        m.content || m.parts?.map((p: any) => p.text || "").join("") || "",
     }));
 
     const result = streamText({
@@ -144,15 +185,27 @@ export async function POST(req: Request) {
             ? error?.stack
             : "Hidden in production",
       });
-    } catch (e) { }
+    } catch (e) {}
 
-    if (error?.message?.includes("insufficient_quota") || error?.code === "insufficient_quota" || error?.type === "insufficient_quota") {
-      return new NextResponse("Service unavailable: OpenAI quota exceeded. Please check billing details.", { status: 503 });
+    if (
+      error?.message?.includes("insufficient_quota") ||
+      error?.code === "insufficient_quota" ||
+      error?.type === "insufficient_quota"
+    ) {
+      return new NextResponse(
+        "Service unavailable: OpenAI quota exceeded. Please check billing details.",
+        { status: 503 }
+      );
     }
 
     if (process.env.NODE_ENV === "development") {
-      return new NextResponse(error.message || error.stack || "Internal Error", { status: 500 });
+      return new NextResponse(
+        error.message || error.stack || "Internal Error",
+        { status: 500 }
+      );
     }
-    return new NextResponse("An anomaly occurred during chat.", { status: 500 });
+    return new NextResponse("An anomaly occurred during chat.", {
+      status: 500,
+    });
   }
 }

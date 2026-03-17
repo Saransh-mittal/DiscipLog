@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useCategoriesContext } from "@/components/CategoriesProvider";
+import DynamicIcon from "@/components/DynamicIcon";
 import {
-  LOG_CATEGORIES,
-  isValidLogCategory,
-  type LogCategory,
   type SprintCompletionStatus,
 } from "@/lib/logs";
 import { Card } from "@/components/ui/card";
@@ -49,7 +48,7 @@ type SprintStatus = "idle" | "running" | "paused" | "awaiting_checkin";
 
 interface SprintState {
   status: SprintStatus;
-  category: LogCategory;
+  category: string;
   plannedMinutes: number;
   accumulatedActiveMs: number;
   startedAt: string | null;
@@ -203,7 +202,7 @@ function restoreSprintState(rawValue: string): SprintState | null {
       typeof parsed.status !== "string" ||
       !["running", "paused", "awaiting_checkin"].includes(parsed.status) ||
       typeof parsed.category !== "string" ||
-      !isValidLogCategory(parsed.category) ||
+      !parsed.category.trim() ||
       !Number.isFinite(parsed.plannedMinutes) ||
       parsed.plannedMinutes! <= 0 ||
       !Number.isFinite(parsed.accumulatedActiveMs) ||
@@ -277,6 +276,7 @@ function splitSummaryBullets(summary: string | null) {
 }
 
 export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
+  const { categories } = useCategoriesContext();
   const [sprint, setSprint] = useState<SprintState>(() => createIdleSprint());
   const [customMinutesInput, setCustomMinutesInput] = useState("50");
   const [nowMs, setNowMs] = useState(() => Date.now());
@@ -444,7 +444,7 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
   const completionReady = sprint.status === "awaiting_checkin";
   const completionBullets = splitSummaryBullets(savedSummary);
 
-  const updateSprintConfig = (category: LogCategory) => {
+  const updateSprintConfig = (category: string) => {
     setSprint((prev) =>
       prev.status === "idle" || prev.status === "awaiting_checkin"
         ? { ...prev, category }
@@ -1448,16 +1448,16 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
                 Sprint Category
               </label>
               <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {LOG_CATEGORIES.map((category) => {
-                  const isActive = sprint.category === category;
+                {categories.map((cat) => {
+                  const isActive = sprint.category === cat.name;
 
                   return (
                     <Button
-                      key={category}
+                      key={cat.name}
                       type="button"
                       variant="outline"
-                      onClick={() => updateSprintConfig(category)}
-                      className="h-11 rounded-xl justify-center border text-xs sm:text-sm font-semibold"
+                      onClick={() => updateSprintConfig(cat.name)}
+                      className="h-11 rounded-xl justify-center border text-xs sm:text-sm font-semibold gap-1.5"
                       style={{
                         borderColor: isActive
                           ? "oklch(0.65 0.19 60 / 24%)"
@@ -1471,7 +1471,8 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
                         fontFamily: "var(--font-body)",
                       }}
                     >
-                      {category}
+                      <DynamicIcon name={cat.icon} className="w-3.5 h-3.5" />
+                      {cat.name}
                     </Button>
                   );
                 })}

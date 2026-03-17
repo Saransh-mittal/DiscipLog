@@ -3,5 +3,5 @@ import { withAuth } from "next-auth/middleware";
 export default withAuth({});
 
 export const config = {
-  matcher: ["/dashboard/:path*", "/api/logs/:path*", "/api/summarize/:path*"],
+  matcher: ["/dashboard/:path*", "/onboarding/:path*", "/api/logs/:path*", "/api/summarize/:path*", "/api/categories/:path*", "/api/onboarding/:path*", "/api/commitments/:path*"],
 };

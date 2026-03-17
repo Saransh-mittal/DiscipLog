@@ -1,9 +1,9 @@
+// Legacy categories for backwards compatibility with existing log entries
 export const LOG_CATEGORIES = [
   "Interview Prep",
   "Building",
   "Learning",
   "Shipping",
-  "Other",
 ] as const;
 
 export const LOG_SOURCES = ["manual", "sprint"] as const;
@@ -18,11 +18,21 @@ export type LogSource = (typeof LOG_SOURCES)[number];
 export type SprintCompletionStatus =
   (typeof SPRINT_COMPLETION_STATUSES)[number];
 
+// Dynamic user-defined category
+export interface UserCategory {
+  name: string;
+  dailyTargetHours: number;
+  weeklyMinTarget: number;
+  weeklyMaxTarget: number;
+  icon: string;
+  isSideCategory?: boolean;
+}
+
 export interface DashboardLog {
   _id: string;
   date: string;
   hours: number;
-  category: LogCategory;
+  category: string;
   rawTranscript: string;
   aiSummary?: string;
   source?: LogSource;
@@ -35,8 +45,8 @@ export interface DashboardLog {
   createdAt?: string;
 }
 
-export function isValidLogCategory(category: string): category is LogCategory {
-  return LOG_CATEGORIES.includes(category as LogCategory);
+export function isValidLogCategory(category: string): boolean {
+  return typeof category === "string" && category.trim().length > 0;
 }
 
 export function isValidLogSource(source: string): source is LogSource {
@@ -112,4 +122,14 @@ export function sortLogsByTimestamp<T extends DashboardLog>(logs: T[]): T[] {
     const timeB = getLogTimestampValue(b)?.getTime() ?? 0;
     return timeB - timeA;
   });
+}
+
+export function getWeekStart(): Date {
+  const now = new Date();
+  const day = now.getDay();
+  const diff = now.getDate() - day + (day === 0 ? -6 : 1);
+  const monday = new Date(now);
+  monday.setDate(diff);
+  monday.setHours(0, 0, 0, 0);
+  return monday;
 }

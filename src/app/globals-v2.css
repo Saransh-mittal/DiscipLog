@@ -198,3 +198,26 @@
   height: 2px;
   background: linear-gradient(90deg, transparent, var(--v2-amber-400), var(--v2-amber-500), transparent);
 }
+
+/* Glow button hover effect */
+.v2-glow-btn {
+  transition: box-shadow 0.2s ease, transform 0.15s ease;
+}
+.v2-glow-btn:hover:not(:disabled) {
+  box-shadow: 0 0 24px oklch(0.65 0.19 60 / 25%), 0 0 8px oklch(0.65 0.19 60 / 15%);
+  transform: translateY(-1px);
+}
+.v2-glow-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* Hide number input spinners globally */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}

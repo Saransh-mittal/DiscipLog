@@ -3,7 +3,8 @@
 import { useMemo } from "react";
 import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { BookOpen, Hammer, GraduationCap, Rocket } from "lucide-react";
+import { useCategoriesContext } from "@/components/CategoriesProvider";
+import DynamicIcon from "@/components/DynamicIcon";
 import { DashboardLog, formatLocalDate } from "@/lib/logs";
 
 interface DailyProgressV2Props {
@@ -11,30 +12,8 @@ interface DailyProgressV2Props {
   loading: boolean;
 }
 
-const DAILY_TARGETS = [
-  {
-    category: "Interview Prep",
-    target: 3, // ~18h / 6 working days
-    icon: BookOpen,
-  },
-  {
-    category: "Building",
-    target: 2, // ~12h / 6 working days
-    icon: Hammer,
-  },
-  {
-    category: "Learning",
-    target: 1, // ~7h / 7 days
-    icon: GraduationCap,
-  },
-  {
-    category: "Shipping",
-    target: 0, // No strict target
-    icon: Rocket,
-  },
-];
-
 export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props) {
+  const { categories, loading: catLoading } = useCategoriesContext();
   const today = useMemo(() => formatLocalDate(new Date()), []);
 
   const todayByCategory = useMemo(() => {
@@ -48,6 +27,7 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
   }, [logs, today]);
 
   const totalToday = Object.values(todayByCategory).reduce((s, h) => s + h, 0);
+  const isLoading = loading || catLoading;
 
   return (
     <Card
@@ -81,7 +61,7 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
                 color: totalToday > 0 ? "var(--v2-amber-300)" : "var(--v2-text-muted)",
               }}
             >
-              {loading ? "—" : `${totalToday}h`}
+              {isLoading ? "—" : `${totalToday}h`}
             </span>
             <span
               className="text-[10px] font-semibold uppercase tracking-[0.15em]"
@@ -95,18 +75,25 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
           </div>
         </div>
 
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-          {DAILY_TARGETS.map((cat) => {
-            const logged = todayByCategory[cat.category] || 0;
-            const isShipping = cat.category === "Shipping";
-            const percentage = isShipping
-              ? logged > 0 ? 100 : 0
-              : cat.target > 0 ? Math.min((logged / cat.target) * 100, 100) : 0;
-            const isDone = isShipping ? logged > 0 : logged >= cat.target;
+        <div
+          className="grid gap-3"
+          style={{
+            gridTemplateColumns: `repeat(${Math.min(categories.length, 4)}, minmax(0, 1fr))`,
+          }}
+        >
+          {categories.map((cat) => {
+            const logged = todayByCategory[cat.name] || 0;
+            const hasTarget = cat.dailyTargetHours > 0;
+            const percentage = hasTarget
+              ? Math.min((logged / cat.dailyTargetHours) * 100, 100)
+              : logged > 0
+                ? 100
+                : 0;
+            const isDone = hasTarget ? logged >= cat.dailyTargetHours : logged > 0;
 
             return (
               <div
-                key={cat.category}
+                key={cat.name}
                 className="rounded-xl p-4 border transition-colors duration-200"
                 style={{
                   background: "var(--v2-surface-raised)",
@@ -117,7 +104,8 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
               >
                 {/* Icon + label */}
                 <div className="flex items-center gap-2 mb-3">
-                  <cat.icon
+                  <DynamicIcon
+                    name={cat.icon}
                     className="w-4 h-4"
                     style={{
                       color: isDone
@@ -132,7 +120,7 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
                       fontFamily: "var(--font-body)",
                     }}
                   >
-                    {cat.category}
+                    {cat.name}
                   </span>
                 </div>
 
@@ -145,17 +133,17 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
                       color: isDone ? "var(--v2-amber-300)" : "var(--v2-text-primary)",
                     }}
                   >
-                    {loading ? "—" : logged}
+                    {isLoading ? "—" : logged}
                   </span>
-                  {!isShipping && (
+                  {hasTarget && (
                     <span
                       className="text-xs font-medium"
                       style={{ color: "var(--v2-text-muted)" }}
                     >
-                      / {cat.target}h
+                      / {cat.dailyTargetHours}h
                     </span>
                   )}
-                  {isShipping && logged > 0 && (
+                  {!hasTarget && logged > 0 && (
                     <span
                       className="text-xs font-medium"
                       style={{ color: "var(--v2-sage-400)" }}
@@ -173,8 +161,8 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
                   <div
                     className="h-full rounded-full"
                     style={{
-                      width: loading ? "0%" : `${percentage}%`,
-                      background: isShipping
+                      width: isLoading ? "0%" : `${percentage}%`,
+                      background: !hasTarget && logged > 0
                         ? "var(--v2-sage-400)"
                         : isDone
                           ? "var(--v2-amber-400)"
@@ -185,24 +173,38 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
                 </div>
 
                 {/* Badge */}
-                {!loading && isDone && (
+                {!isLoading && isDone && (
                   <Badge
                     variant="outline"
                     className="mt-2 text-[9px] px-1.5 py-0 border"
                     style={{
-                      borderColor: isShipping
+                      borderColor: !hasTarget
                         ? "oklch(0.62 0.14 155 / 25%)"
                         : "oklch(0.65 0.19 60 / 25%)",
-                      color: isShipping
+                      color: !hasTarget
                         ? "var(--v2-sage-400)"
                         : "var(--v2-amber-400)",
-                      background: isShipping
+                      background: !hasTarget
                         ? "oklch(0.62 0.14 155 / 5%)"
                         : "oklch(0.65 0.19 60 / 5%)",
                       fontFamily: "var(--font-body)",
                     }}
                   >
-                    {isShipping ? "Shipped!" : "Done!"}
+                    Done!
+                  </Badge>
+                )}
+                {!isLoading && !isDone && cat.isSideCategory && (
+                  <Badge
+                    variant="outline"
+                    className="mt-2 text-[9px] px-1.5 py-0 border"
+                    style={{
+                      borderColor: "transparent",
+                      color: "var(--v2-text-muted)",
+                      background: "var(--v2-surface-overlay)",
+                      fontFamily: "var(--font-body)",
+                    }}
+                  >
+                    Optional
                   </Badge>
                 )}
               </div>

@@ -1,9 +1,7 @@
 import mongoose, { Schema, Document } from "mongoose";
 import {
-  LOG_CATEGORIES,
   LOG_SOURCES,
   SPRINT_COMPLETION_STATUSES,
-  type LogCategory,
   type LogSource,
   type SprintCompletionStatus,
 } from "@/lib/logs";
@@ -12,7 +10,7 @@ export interface ILogEntry extends Document {
   userId: mongoose.Types.ObjectId;
   date: string; // YYYY-MM-DD format for easy querying
   hours: number;
-  category: LogCategory;
+  category: string;
   rawTranscript: string;
   aiSummary?: string;
   source: LogSource;
@@ -29,7 +27,7 @@ const LogEntrySchema: Schema = new Schema({
   userId: { type: Schema.Types.ObjectId, ref: "User", required: true },
   date: { type: String, required: true },
   hours: { type: Number, required: true },
-  category: { type: String, required: true, enum: LOG_CATEGORIES },
+  category: { type: String, required: true },
   rawTranscript: { type: String, required: true },
   aiSummary: { type: String },
   source: { type: String, enum: LOG_SOURCES, default: "manual" },

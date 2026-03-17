@@ -14,7 +14,10 @@ import {
   TrendingUp,
   Target,
   BarChart3,
+  Mic,
+  Square,
 } from "lucide-react";
+import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
 
 interface AIAssistantV2Props {
   logs: any[];
@@ -208,7 +211,14 @@ export default function AIAssistantV2({ logs }: AIAssistantV2Props) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
-  const [input, setInput] = useState("");
+  const {
+    isListening,
+    transcript: input,
+    setTranscript: setInput,
+    startListening,
+    stopListening,
+    supported,
+  } = useSpeechRecognition();
 
   // Transport creates a new instance explicitly mapped to our Chat API
   const transport = useMemo(
@@ -672,18 +682,44 @@ export default function AIAssistantV2({ logs }: AIAssistantV2Props) {
               value={input}
               onChange={(e) => setInput(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder="Ask about your productivity…"
+              placeholder={isListening ? "Listening…" : "Ask about your productivity…"}
               className="dcl-input flex-1 min-h-[40px] max-h-[80px] resize-none rounded-xl px-3.5 py-2.5 text-[13px]"
               style={{
                 background: "oklch(1 0 0 / 4%)",
-                border: "1px solid oklch(1 0 0 / 8%)",
+                border: isListening ? "1px solid var(--v2-amber-400)" : "1px solid oklch(1 0 0 / 8%)",
                 color: "oklch(0.9 0.01 250)",
                 fontFamily: "var(--font-body)",
                 outline: "none",
+                boxShadow: isListening ? "0 0 15px oklch(0.65 0.19 60 / 15%)" : "none",
                 transition: "border-color 0.2s ease, box-shadow 0.2s ease",
               }}
               rows={1}
             />
+            {supported && (
+              <button
+                type="button"
+                onClick={isListening ? stopListening : startListening}
+                className="dcl-send-btn h-10 w-10 rounded-xl flex items-center justify-center shrink-0"
+                style={{
+                  background: isListening
+                    ? "oklch(0.65 0.19 60 / 15%)"
+                    : "oklch(1 0 0 / 5%)",
+                  border: isListening
+                    ? "1px solid var(--v2-amber-400)"
+                    : "1px solid transparent",
+                  color: isListening
+                    ? "var(--v2-amber-300)"
+                    : "oklch(0.5 0.01 250)",
+                  transition: "all 0.2s ease"
+                }}
+              >
+                {isListening ? (
+                  <Square className="w-4 h-4 fill-current animate-pulse" />
+                ) : (
+                  <Mic className="w-4 h-4" />
+                )}
+              </button>
+            )}
             <button
               type="submit"
               disabled={!input.trim() || isBusy}

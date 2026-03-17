@@ -1,7 +1,7 @@
 # DiscipLog Architecture
 
 ## Overview
-DiscipLog is a robust discipline-logging application designed to be scalable, responsive, and seamless across platforms, relying on artificial intelligence to contextualize time spent. The V2 dashboard is a multi-page application (Overview, Log, History) that supports direct manual logs, in-app eggtimer-style sprint sessions, and post-save log management (edit, regenerate summary, and delete), with all flows converging into the same persisted log model.
+DiscipLog is a robust discipline-logging application designed to be scalable, responsive, and seamless across platforms, relying on artificial intelligence to contextualize time spent. The V2 dashboard is a multi-page application (Overview, Log, History, Settings) that supports direct manual logs, in-app eggtimer-style sprint sessions, post-save log management (edit, regenerate summary, and delete), and weekly commitment tracking. All flows converge into the same persisted log model, utilizing AI-facilitated user onboarding and fully dynamic, user-defined categories.
 
 ## Core Stack
 - **Framework:** Next.js 16 (App Router) + TypeScript
@@ -48,7 +48,8 @@ Instead of failing silently to standard Next.js 500 pages, errors are ingested i
 3. Both flows call the shared summarization route, then save into the same `LogEntry` collection.
 4. When logs are created or edited, the server stores a canonical UTC `loggedAt` timestamp and derives the `date` bucket from the caller's timezone so local-day widgets remain consistent for the user.
 5. The V2 history feed (on `/dashboard/history`) exposes a dedicated editor modal that can update duration, transcript, AI summary, and timestamp; regenerate draft summaries; and permanently delete user-owned logs.
-6. Downstream dashboard systems such as progress widgets, history, heatmap, and AI coaching consume the unified log stream rather than separate manual-vs-sprint stores.
+6. A Settings and Onboarding flow allow users to seamlessly generate their own dynamic tracking categories (e.g. "Piano Practice", "Client Work") with AI-suggested icons and automated weekly tracking quotas.
+7. Downstream dashboard systems such as progress widgets, history, heatmap, weekly commitments, and AI coaching consume the unified log stream and dynamic user categories rather than separate manual-vs-sprint stores or hardcoded enums.
 
 ## Shared Helpers
 - `src/lib/log-summary.ts` centralizes the OpenAI summarization prompt used by `/api/summarize` and `/api/logs/[id]/summary`.

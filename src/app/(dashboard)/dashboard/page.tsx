@@ -10,6 +10,7 @@ const CalendarV2 = dynamic(() => import("@/components/CalendarV2"), { ssr: false
 const WeeklyProgressV2 = dynamic(() => import("@/components/WeeklyProgressV2"), { ssr: false });
 const AIAssistantV2 = dynamic(() => import("@/components/AIAssistantV2"), { ssr: false });
 const DailyProgressV2 = dynamic(() => import("@/components/DailyProgressV2"), { ssr: false });
+const CommitmentTracker = dynamic(() => import("@/components/CommitmentTracker"), { ssr: false });
 
 export default function DashboardPage() {
   const [logs, setLogs] = useState<DashboardLog[]>([]);
@@ -145,6 +146,10 @@ export default function DashboardPage() {
       </div>
 
       <div className="v2-stagger-in v2-stagger-4">
+        <CommitmentTracker />
+      </div>
+
+      <div className="v2-stagger-in v2-stagger-5">
         <WeeklyProgressV2 logs={logs} loading={loading} />
       </div>
 

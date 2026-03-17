@@ -2,12 +2,14 @@
 
 import { useState } from "react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import { useCategoriesContext } from "@/components/CategoriesProvider";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Mic, Square, Loader2, Save, Plus, Minus, CheckCircle2 } from "lucide-react";
-import { DashboardLog, LOG_CATEGORIES, type LogCategory } from "@/lib/logs";
+import { Mic, Square, Loader2, Save, CheckCircle2 } from "lucide-react";
+import DynamicIcon from "@/components/DynamicIcon";
+import type { DashboardLog } from "@/lib/logs";
 
 interface LoggerV2Props {
   onLogSaved?: () => void;
@@ -24,11 +26,16 @@ export default function LoggerV2({ onLogSaved }: LoggerV2Props) {
     resetTranscript,
   } = useSpeechRecognition();
 
-  const [category, setCategory] = useState<LogCategory>("Building");
-  const [hours, setHours] = useState(2);
+  const { categories } = useCategoriesContext();
+  const [category, setCategory] = useState("");
+  const [inputHours, setInputHours] = useState<number | "">(2);
+  const [inputMinutes, setInputMinutes] = useState<number | "">(0);
   const [isSummarizing, setIsSummarizing] = useState(false);
   const [savedLog, setSavedLog] = useState<DashboardLog | null>(null);
   const [showSuccess, setShowSuccess] = useState(false);
+
+  // Default to first category if not set
+  const activeCategory = category || categories[0]?.name || "";
 
   const handleSave = async () => {
     if (!transcript.trim()) return;
@@ -40,20 +47,21 @@ export default function LoggerV2({ onLogSaved }: LoggerV2Props) {
 
       const sumRes = await fetch("/api/summarize", {
         method: "POST",
-        body: JSON.stringify({ text: transcript, category }),
+        body: JSON.stringify({ text: transcript, category: activeCategory }),
         headers: { "Content-Type": "application/json" },
       });
       if (!sumRes.ok) {
         throw new Error(await sumRes.text());
       }
       const sumData = await sumRes.json();
+      const totalHours = (Number(inputHours) || 0) + (Number(inputMinutes) || 0) / 60;
 
       const res = await fetch("/api/logs", {
         method: "POST",
         body: JSON.stringify({
           source: "manual",
-          hours,
-          category,
+          hours: totalHours,
+          category: activeCategory,
           rawTranscript: transcript,
           summary: sumData.summary,
           loggedAt,
@@ -68,7 +76,6 @@ export default function LoggerV2({ onLogSaved }: LoggerV2Props) {
         resetTranscript();
         setShowSuccess(true);
         onLogSaved?.();
-        // Auto-hide success after 6 seconds
         setTimeout(() => setShowSuccess(false), 6000);
       } else {
         throw new Error(await res.text());
@@ -79,9 +86,6 @@ export default function LoggerV2({ onLogSaved }: LoggerV2Props) {
       setIsSummarizing(false);
     }
   };
-
-  const incrementHours = () => setHours((h) => Math.min(h + 0.5, 24));
-  const decrementHours = () => setHours((h) => Math.max(h - 0.5, 0.5));
 
   return (
     <Card
@@ -121,8 +125,8 @@ export default function LoggerV2({ onLogSaved }: LoggerV2Props) {
             Category
           </label>
           <Tabs
-            value={category}
-            onValueChange={(value) => setCategory(value as LogCategory)}
+            value={activeCategory}
+            onValueChange={(value) => setCategory(value)}
           >
             <TabsList
               className="w-full flex flex-wrap gap-2 h-auto p-1 rounded-xl"
@@ -130,31 +134,32 @@ export default function LoggerV2({ onLogSaved }: LoggerV2Props) {
                 background: "var(--v2-surface-raised)",
               }}
             >
-              {LOG_CATEGORIES.map((cat) => (
+              {categories.map((cat) => (
                 <TabsTrigger
-                  key={cat}
-                  value={cat}
-                  className="flex-1 min-w-[80px] text-xs font-semibold py-2 px-3 rounded-lg transition-all duration-200 data-[state=active]:shadow-md"
+                  key={cat.name}
+                  value={cat.name}
+                  className="flex-1 min-w-[80px] text-xs font-semibold py-2 px-3 rounded-lg transition-all duration-200 data-[state=active]:shadow-md flex items-center gap-1.5"
                   style={{
                     fontFamily: "var(--font-body)",
                     color:
-                      category === cat
+                      activeCategory === cat.name
                         ? "var(--v2-obsidian-900)"
                         : "var(--v2-text-muted)",
                     background:
-                      category === cat
+                      activeCategory === cat.name
                         ? "var(--v2-amber-400)"
                         : "transparent",
                   }}
                 >
-                  {cat}
+                  <DynamicIcon name={cat.icon} className="w-3.5 h-3.5" />
+                  {cat.name}
                 </TabsTrigger>
               ))}
             </TabsList>
           </Tabs>
         </div>
 
-        {/* Hours stepper */}
+        {/* Time Inputs */}
         <div className="mb-6">
           <label
             className="text-[10px] font-bold uppercase tracking-[0.15em] mb-3 block"
@@ -163,50 +168,60 @@ export default function LoggerV2({ onLogSaved }: LoggerV2Props) {
               fontFamily: "var(--font-body)",
             }}
           >
-            Hours Logged
+            Time Logged
           </label>
-          <div className="flex items-center gap-3">
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={decrementHours}
-              className="h-10 w-10 rounded-xl border transition-all"
-              style={{
-                borderColor: "var(--v2-border-strong)",
-                background: "var(--v2-surface-raised)",
-                color: "var(--v2-text-secondary)",
-              }}
-            >
-              <Minus className="w-4 h-4" />
-            </Button>
-            <div
-              className="text-3xl font-bold tracking-tight min-w-[80px] text-center"
-              style={{
-                fontFamily: "var(--font-display)",
-                color: "var(--v2-amber-300)",
-              }}
-            >
-              {hours}
+          <div className="flex items-center gap-4">
+            <div className="flex items-center gap-2">
+              <input
+                type="number"
+                value={inputHours}
+                onChange={(e) =>
+                  setInputHours(
+                    e.target.value ? Math.max(0, parseInt(e.target.value) || 0) : ""
+                  )
+                }
+                className="h-12 w-20 rounded-xl border text-center text-2xl font-bold shadow-none transition-all duration-200 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] focus:outline-none focus:ring-2 flex-shrink-0"
+                style={{
+                  background: "var(--v2-surface-overlay)",
+                  borderColor: "var(--v2-border-strong)",
+                  color: "var(--v2-amber-300)",
+                  fontFamily: "var(--font-display)",
+                }}
+                min={0}
+              />
               <span
-                className="text-sm font-semibold ml-1"
-                style={{ color: "var(--v2-text-muted)" }}
+                className="text-sm font-semibold whitespace-nowrap"
+                style={{ color: "var(--v2-text-muted)", fontFamily: "var(--font-body)" }}
               >
                 hrs
               </span>
             </div>
-            <Button
-              variant="outline"
-              size="icon"
-              onClick={incrementHours}
-              className="h-10 w-10 rounded-xl border transition-all"
-              style={{
-                borderColor: "var(--v2-border-strong)",
-                background: "var(--v2-surface-raised)",
-                color: "var(--v2-text-secondary)",
-              }}
-            >
-              <Plus className="w-4 h-4" />
-            </Button>
+            <div className="flex items-center gap-2 flex-wrap">
+              <input
+                type="number"
+                value={inputMinutes}
+                onChange={(e) =>
+                  setInputMinutes(
+                    e.target.value ? Math.max(0, parseInt(e.target.value) || 0) : ""
+                  )
+                }
+                className="h-12 w-20 rounded-xl border text-center text-2xl font-bold shadow-none transition-all duration-200 [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none [-moz-appearance:textfield] focus:outline-none focus:ring-2 flex-shrink-0"
+                style={{
+                  background: "var(--v2-surface-overlay)",
+                  borderColor: "var(--v2-border-strong)",
+                  color: "var(--v2-amber-300)",
+                  fontFamily: "var(--font-display)",
+                }}
+                min={0}
+                max={59}
+              />
+              <span
+                className="text-sm font-semibold whitespace-nowrap"
+                style={{ color: "var(--v2-text-muted)", fontFamily: "var(--font-body)" }}
+              >
+                mins
+              </span>
+            </div>
           </div>
         </div>
 
