@@ -185,7 +185,7 @@ export default function LogEditorDialog({
           className="h-[2px] w-full"
           style={{
             background:
-              "linear-gradient(90deg, var(--v2-amber-500), var(--v2-amber-300), var(--v2-amber-500))",
+              "linear-gradient(90deg, var(--world-accent, var(--v2-amber-500)), color-mix(in oklch, var(--world-accent, var(--v2-amber-300)) 80%, white), var(--world-accent, var(--v2-amber-500)))",
           }}
         />
 
@@ -337,7 +337,7 @@ export default function LogEditorDialog({
                   style={{
                     background: "var(--v2-obsidian-700)",
                     borderColor: "var(--v2-border-strong)",
-                    color: "var(--v2-amber-300)",
+                    color: "var(--world-accent, var(--v2-amber-300))",
                   }}
                 >
                   {isRegenerating ? (
@@ -404,7 +404,7 @@ export default function LogEditorDialog({
             className="rounded-xl"
             style={{
               background:
-                "linear-gradient(135deg, var(--v2-amber-500), var(--v2-amber-600))",
+                "linear-gradient(135deg, var(--world-accent, var(--v2-amber-500)), color-mix(in oklch, var(--world-accent, var(--v2-amber-600)) 80%, black))",
               color: "var(--v2-obsidian-900)",
               border: "none",
             }}

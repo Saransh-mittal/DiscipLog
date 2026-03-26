@@ -7,11 +7,9 @@ import DynamicIcon from "@/components/DynamicIcon";
 import {
   type SprintCompletionStatus,
 } from "@/lib/logs";
-import { Card } from "@/components/ui/card";
 import { Textarea } from "@/components/ui/textarea";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import {
   Dialog,
   DialogContent,
@@ -25,7 +23,6 @@ import {
   Bell,
   BellOff,
   CheckCircle2,
-  Clock3,
   Flag,
   Loader2,
   Mic,
@@ -279,6 +276,7 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
   const { categories } = useCategoriesContext();
   const [sprint, setSprint] = useState<SprintState>(() => createIdleSprint());
   const [customMinutesInput, setCustomMinutesInput] = useState("50");
+  const [incrementMinutesInput, setIncrementMinutesInput] = useState("");
   const [nowMs, setNowMs] = useState(() => Date.now());
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -444,6 +442,23 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
   const completionReady = sprint.status === "awaiting_checkin";
   const completionBullets = splitSummaryBullets(savedSummary);
 
+  useEffect(() => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    if (sprint.status === "running" || sprint.status === "paused") {
+      const formattedTime = formatCountdown(remainingMs);
+      document.title = `${formattedTime} - Sprint`;
+    } else {
+      document.title = "DiscipLog";
+    }
+
+    return () => {
+      document.title = "DiscipLog";
+    };
+  }, [sprint.status, remainingMs]);
+
   const updateSprintConfig = (category: string) => {
     setSprint((prev) =>
       prev.status === "idle" || prev.status === "awaiting_checkin"
@@ -600,6 +615,36 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
     setIsDialogOpen(true);
   };
 
+  const handleAddMoreTime = (additionalMinutes: number) => {
+    setIsDialogOpen(false);
+    setJustCompleted(false);
+    setSaveError(null);
+    completionHandledRef.current = false;
+    stopListening();
+    setSprint((prev) => {
+      const newPlanned = prev.plannedMinutes + additionalMinutes;
+      setCustomMinutesInput(String(newPlanned));
+      return {
+        ...prev,
+        status: "running",
+        plannedMinutes: newPlanned,
+        lastResumedAt: new Date().toISOString(),
+        completedAt: null,
+        completionStatus: null,
+      };
+    });
+    setNowMs(Date.now());
+  };
+
+  const handleAddCustomTime = () => {
+    const numeric = Number(incrementMinutesInput);
+    if (!incrementMinutesInput || !Number.isFinite(numeric) || numeric <= 0) {
+      return;
+    }
+    handleAddMoreTime(Math.round(numeric));
+    setIncrementMinutesInput("");
+  };
+
   const handleVoiceToggle = () => {
     if (!supported || sprint.status !== "awaiting_checkin") {
       return;
@@ -687,690 +732,273 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
     }
   };
 
+  /* ─── Alert toggle helper ─── */
+  const alertsGranted = notificationPermission === "granted";
+  const alertsBlocked = notificationPermission === "denied";
+  const alertsAvailable =
+    notificationPermission !== "unsupported" && !alertsGranted && !alertsBlocked;
+
   return (
     <>
-      <Card
-        className="relative overflow-hidden border p-0"
-        style={{
-          background: justCompleted
-            ? "linear-gradient(180deg, oklch(0.16 0.01 260), oklch(0.12 0.008 260))"
-            : "var(--v2-surface)",
-          borderColor: completionReady
-            ? "oklch(0.65 0.19 60 / 25%)"
-            : "var(--v2-border)",
-          boxShadow: completionReady
-            ? "0 0 0 1px oklch(0.65 0.19 60 / 12%), 0 24px 60px oklch(0 0 0 / 24%)"
-            : "none",
-        }}
+      <div
+        className="sprint-card"
+        data-status={sprint.status}
+        data-completed={justCompleted ? "true" : undefined}
       >
-        <div
-          className="h-[2px] w-full"
-          style={{
-            background:
-              sprint.status === "running"
-                ? "linear-gradient(90deg, var(--v2-amber-600), var(--v2-amber-300), var(--v2-amber-500))"
-                : "linear-gradient(90deg, var(--v2-sage-500), var(--v2-amber-300), var(--v2-amber-500))",
-          }}
-        />
-
-        <div className="p-6 md:p-8">
-          <div className="flex items-start justify-between gap-4 mb-6">
-            <div>
-              <div className="flex items-center gap-2 mb-2">
-                <Badge
-                  variant="outline"
-                  className="text-[10px] px-2.5 py-1 border"
-                  style={{
-                    borderColor: "oklch(0.65 0.19 60 / 18%)",
-                    color: "var(--v2-amber-300)",
-                    background: "oklch(0.65 0.19 60 / 6%)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  Eggtimer Sprint
-                </Badge>
-                {completionReady && (
-                  <Badge
-                    variant="outline"
-                    className="text-[10px] px-2.5 py-1 border"
-                    style={{
-                      borderColor: "oklch(0.62 0.14 155 / 22%)",
-                      color: "var(--v2-sage-400)",
-                      background: "oklch(0.62 0.14 155 / 6%)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    Ready To Log
-                  </Badge>
-                )}
-              </div>
-              <h3
-                className="text-lg font-bold tracking-tight"
-                style={{ fontFamily: "var(--font-display)" }}
-              >
-                Sprint Mode
-              </h3>
-              <p
-                className="text-sm mt-1 max-w-sm leading-relaxed"
-                style={{
-                  color: "var(--v2-text-secondary)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                Run a focused block here, then capture what you shipped before the momentum cools.
-              </p>
-            </div>
-
-            <div
-              className="rounded-2xl border px-4 py-3 min-w-[128px]"
-              style={{
-                borderColor: completionReady
-                  ? "oklch(0.65 0.19 60 / 22%)"
-                  : "var(--v2-border)",
-                background: "var(--v2-surface-raised)",
-              }}
-            >
-              <div
-                className="text-[10px] font-semibold uppercase tracking-[0.2em] mb-1"
-                style={{
-                  color: "var(--v2-text-muted)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                Remaining
-              </div>
-              <div
-                className="text-3xl font-bold tracking-tight tabular-nums"
-                style={{
-                  fontFamily: "var(--font-display)",
-                  color: completionReady
-                    ? "var(--v2-sage-400)"
-                    : "var(--v2-amber-300)",
-                }}
-              >
+        {/* ─── IDLE STATE ─── */}
+        {sprint.status === "idle" && (
+          <>
+            {/* Timer display */}
+            <div className="sprint-timer-display">
+              <span className="sprint-timer-value">
                 {formatCountdown(remainingMs)}
-              </div>
-            </div>
-          </div>
-
-          <div
-            className="mb-6 rounded-2xl border p-4 flex flex-col gap-3 md:flex-row md:items-center md:justify-between"
-            style={{
-              background: "var(--v2-surface-raised)",
-              borderColor:
-                notificationPermission === "granted"
-                  ? "oklch(0.62 0.14 155 / 22%)"
-                  : "var(--v2-border)",
-            }}
-          >
-            <div>
-              <div className="flex items-center gap-2 mb-1.5">
-                {notificationPermission === "granted" ? (
-                  <Bell
-                    className="w-4 h-4"
-                    style={{ color: "var(--v2-sage-400)" }}
-                  />
-                ) : (
-                  <BellOff
-                    className="w-4 h-4"
-                    style={{ color: "var(--v2-amber-300)" }}
-                  />
-                )}
-                <span
-                  className="text-sm font-semibold"
-                  style={{
-                    color: "var(--v2-text-primary)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  Finish alerts
-                </span>
-              </div>
-              <p
-                className="text-xs leading-relaxed max-w-md"
-                style={{
-                  color: "var(--v2-text-secondary)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                The timer beeps when it ends. Enable browser alerts too if you want a permission-based reminder while the tab is in the background.
-              </p>
-              {notificationPermission === "denied" ? (
-                <p
-                  className="text-xs mt-2"
-                  style={{
-                    color: "var(--v2-amber-300)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  Browser alerts are currently blocked for this site. The beep will still work here, and you can re-enable notifications from your browser or site settings.
-                </p>
-              ) : null}
-              {alertError ? (
-                <p
-                  className="text-xs mt-2"
-                  style={{
-                    color: "var(--v2-rose-400)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  {alertError}
-                </p>
-              ) : null}
+              </span>
             </div>
 
-            <Button
-              type="button"
-              variant="outline"
-              disabled={
-                sprint.status !== "idle" ||
-                notificationPermission === "unsupported" ||
-                notificationPermission === "granted" ||
-                notificationPermission === "denied"
-              }
-              onClick={requestAlertPermission}
-              className="rounded-xl h-11 px-4 font-semibold"
-              style={{
-                borderColor:
-                  notificationPermission === "granted"
-                    ? "oklch(0.62 0.14 155 / 24%)"
-                    : "var(--v2-border-strong)",
-                background:
-                  notificationPermission === "granted"
-                    ? "oklch(0.62 0.14 155 / 8%)"
-                    : "transparent",
-                color:
-                  notificationPermission === "granted"
-                    ? "var(--v2-sage-400)"
-                    : "var(--v2-text-secondary)",
-                fontFamily: "var(--font-body)",
-              }}
-            >
-              <Volume2 className="w-4 h-4" />
-              {notificationPermission === "granted"
-                ? "Alerts Enabled"
-                : notificationPermission === "denied"
-                  ? "Alerts Blocked"
-                : notificationPermission === "unsupported"
-                  ? "Alerts Unavailable"
-                  : "Enable Alerts"}
-            </Button>
-          </div>
-
-          {sprint.status !== "idle" ? (
-            <div
-              className="rounded-[24px] border p-5 mb-6 overflow-hidden"
-              style={{
-                background:
-                  "linear-gradient(180deg, oklch(0.16 0.01 260), oklch(0.12 0.008 260))",
-                borderColor: "var(--v2-border)",
-              }}
-            >
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <div>
-                  <p
-                    className="text-[10px] font-semibold uppercase tracking-[0.2em] mb-1"
-                    style={{
-                      color: "var(--v2-text-muted)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    Session Pulse
-                  </p>
-                  <div
-                    className="text-sm"
-                    style={{
-                      color: "var(--v2-text-secondary)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    {completionReady
-                      ? "Timer complete. Capture the result while it is fresh."
-                      : `${formatMinutesLabel(activeMinutes)} logged so far`}
-                  </div>
-                </div>
-
-                <div className="flex items-center gap-2">
-                  <Clock3
-                    className="w-4 h-4"
-                    style={{
-                      color: completionReady
-                        ? "var(--v2-sage-400)"
-                        : "var(--v2-amber-400)",
-                    }}
-                  />
-                  <span
-                    className="text-xs font-semibold uppercase tracking-[0.15em]"
-                    style={{
-                      color: completionReady
-                        ? "var(--v2-sage-400)"
-                        : sprint.status === "running"
-                          ? "var(--v2-amber-300)"
-                          : "var(--v2-text-muted)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    {completionReady
-                      ? "check-in"
-                      : sprint.status === "running"
-                        ? "live"
-                        : "paused"}
-                  </span>
-                </div>
-              </div>
-
-              <div
-                className="h-2 rounded-full overflow-hidden"
-                style={{ background: "var(--v2-surface-raised)" }}
-              >
-                <div
-                  className="h-full rounded-full transition-all duration-700"
-                  style={{
-                    width: `${progress}%`,
-                    background: completionReady
-                      ? "linear-gradient(90deg, var(--v2-sage-500), var(--v2-sage-400))"
-                      : "linear-gradient(90deg, var(--v2-amber-600), var(--v2-amber-300))",
-                    boxShadow: completionReady
-                      ? "0 0 20px oklch(0.62 0.14 155 / 30%)"
-                      : "0 0 24px oklch(0.65 0.19 60 / 24%)",
-                  }}
-                />
-              </div>
-
-              <div
-                className="mt-4 flex items-center justify-between text-[11px] font-semibold"
-                style={{
-                  color: "var(--v2-text-muted)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                <span>{formatMinutesLabel(roundElapsedMinutes(elapsedMs))} elapsed</span>
-                <span>{formatMinutesLabel(sprint.plannedMinutes)} planned</span>
-              </div>
-            </div>
-          ) : null}
-
-          <div className="mb-6">
-            <label
-              className="text-[10px] font-bold uppercase tracking-[0.15em] mb-3 block"
-              style={{
-                color: "var(--v2-text-muted)",
-                fontFamily: "var(--font-body)",
-              }}
-            >
-              Duration
-            </label>
-            <div
-              className="rounded-2xl border p-4"
-              style={{
-                background:
-                  selectedPreset === null
-                    ? "oklch(0.65 0.19 60 / 6%)"
-                    : "var(--v2-surface-raised)",
-                borderColor:
-                  selectedPreset === null
-                    ? "oklch(0.65 0.19 60 / 20%)"
-                    : "var(--v2-border-strong)",
-              }}
-            >
-              <div className="flex items-center justify-between gap-3 mb-3">
-                <div>
-                  <p
-                    className="text-sm font-semibold"
-                    style={{
-                      color: "var(--v2-text-primary)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    Sprint
-                  </p>
-                  <p
-                    className="text-xs"
-                    style={{
-                      color: "var(--v2-text-muted)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    Set any duration between {MIN_CUSTOM_MINUTES} and {MAX_CUSTOM_MINUTES} minutes.
-                  </p>
-                </div>
-                <span
-                  className="text-[11px] font-semibold uppercase tracking-[0.15em]"
-                  style={{
-                    color:
-                      selectedPreset === null
-                        ? "var(--v2-amber-300)"
-                        : "var(--v2-text-muted)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  {formatMinutesLabel(sprint.plannedMinutes)}
-                </span>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={sprint.status !== "idle"}
-                  onClick={() => adjustCustomMinutes(-1)}
-                  className="h-11 w-11 rounded-xl border"
-                  style={{
-                    borderColor: "var(--v2-border-strong)",
-                    background: "var(--v2-surface-overlay)",
-                    color: "var(--v2-text-secondary)",
-                  }}
-                >
-                  <Minus className="w-4 h-4" />
-                </Button>
-                <Input
-                  inputMode="numeric"
-                  placeholder="Minutes"
-                  value={customMinutesInput}
-                  disabled={sprint.status !== "idle"}
-                  onChange={(event) => handleCustomMinutesChange(event.target.value)}
-                  className="h-11 rounded-xl border text-sm text-center"
-                  style={{
-                    background: "var(--v2-surface-raised)",
-                    borderColor:
-                      selectedPreset === null && customMinutesInput
-                        ? "oklch(0.65 0.19 60 / 24%)"
-                        : "var(--v2-border-strong)",
-                    color: "var(--v2-text-primary)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                />
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={sprint.status !== "idle"}
-                  onClick={() => adjustCustomMinutes(1)}
-                  className="h-11 w-11 rounded-xl border"
-                  style={{
-                    borderColor: "var(--v2-border-strong)",
-                    background: "var(--v2-surface-overlay)",
-                    color: "var(--v2-text-secondary)",
-                  }}
-                >
-                  <Plus className="w-4 h-4" />
-                </Button>
-              </div>
-
-              <p
-                className="text-[11px] mt-3"
-                style={{
-                  color: "var(--v2-text-muted)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                Quick sprints:{" "}
-                <span style={{ color: "var(--v2-amber-300)" }}>
-                  tap a preset below or type your own time above.
-                </span>
-              </p>
-            </div>
-
-            <div className="grid grid-cols-3 gap-2 mt-3">
+            {/* Duration presets + custom */}
+            <div className="sprint-duration-row">
               {DURATION_PRESETS.map((minutes) => (
-                <Button
+                <button
                   key={minutes}
                   type="button"
-                  variant="outline"
-                  disabled={sprint.status !== "idle"}
                   onClick={() => {
                     setCustomMinutesInput(String(minutes));
                     applyDuration(minutes);
                   }}
-                  className="h-10 rounded-xl border text-xs font-semibold disabled:opacity-50"
-                  style={{
-                    borderColor:
-                      selectedPreset === minutes
-                        ? "oklch(0.65 0.19 60 / 24%)"
-                        : "var(--v2-border-strong)",
-                    background:
-                      selectedPreset === minutes
-                        ? "oklch(0.65 0.19 60 / 8%)"
-                        : "var(--v2-surface-raised)",
-                    color:
-                      selectedPreset === minutes
-                        ? "var(--v2-amber-300)"
-                        : "var(--v2-text-secondary)",
-                    fontFamily: "var(--font-body)",
-                  }}
+                  className={`sprint-preset-chip ${selectedPreset === minutes ? "active" : ""}`}
                 >
                   {minutes}m
-                </Button>
+                </button>
+              ))}
+              <div className="sprint-custom-duration">
+                <button
+                  type="button"
+                  onClick={() => adjustCustomMinutes(-5)}
+                  className="sprint-adjust-btn"
+                  aria-label="Decrease duration"
+                >
+                  <Minus className="w-3 h-3" />
+                </button>
+                <input
+                  type="text"
+                  inputMode="numeric"
+                  value={customMinutesInput}
+                  onChange={(event) => handleCustomMinutesChange(event.target.value)}
+                  className="sprint-custom-input"
+                  aria-label="Custom minutes"
+                />
+                <button
+                  type="button"
+                  onClick={() => adjustCustomMinutes(5)}
+                  className="sprint-adjust-btn"
+                  aria-label="Increase duration"
+                >
+                  <Plus className="w-3 h-3" />
+                </button>
+              </div>
+            </div>
+
+            {/* Category pills */}
+            <div className="sprint-category-row">
+              {categories.map((cat) => (
+                <button
+                  key={cat.name}
+                  type="button"
+                  onClick={() => updateSprintConfig(cat.name)}
+                  className={`sprint-cat-pill ${sprint.category === cat.name ? "active" : ""}`}
+                >
+                  <DynamicIcon name={cat.icon} className="w-3 h-3" />
+                  {cat.name}
+                </button>
               ))}
             </div>
-          </div>
 
-          <div className="flex flex-col sm:flex-row gap-3">
-            {sprint.status === "idle" && (
+            {/* Start + Alert toggle */}
+            <div className="sprint-start-row">
               <Button
                 type="button"
                 onClick={handleStart}
-                className="flex-1 h-12 rounded-xl font-bold text-sm gap-2 v2-glow-btn"
-                style={{
-                  background:
-                    "linear-gradient(135deg, var(--v2-amber-500), var(--v2-amber-600))",
-                  color: "var(--v2-obsidian-900)",
-                  fontFamily: "var(--font-body)",
-                  border: "none",
-                }}
+                className="sprint-start-btn v2-glow-btn"
               >
                 <Play className="w-4 h-4 fill-current" />
-                Start {formatMinutesLabel(sprint.plannedMinutes)} Sprint
+                Start {formatMinutesLabel(sprint.plannedMinutes)}
               </Button>
-            )}
 
-            {sprint.status === "running" && (
-              <>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handlePause}
-                  className="flex-1 h-12 rounded-xl font-bold text-sm gap-2 border"
-                  style={{
-                    borderColor: "var(--v2-border-strong)",
-                    background: "var(--v2-surface-raised)",
-                    color: "var(--v2-text-secondary)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  <Pause className="w-4 h-4 fill-current" />
-                  Pause
-                </Button>
-                <Button
-                  type="button"
-                  onClick={handleFinishNow}
-                  className="flex-1 h-12 rounded-xl font-bold text-sm gap-2"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, oklch(0.62 0.14 155), oklch(0.56 0.13 155))",
-                    color: "var(--v2-obsidian-900)",
-                    fontFamily: "var(--font-body)",
-                    border: "none",
-                  }}
-                >
-                  <Flag className="w-4 h-4" />
-                  Finish Now
-                </Button>
-              </>
-            )}
+              {/* Compact notification toggle */}
+              <button
+                type="button"
+                onClick={alertsAvailable ? requestAlertPermission : undefined}
+                className={`sprint-alert-toggle ${alertsGranted ? "granted" : ""}`}
+                title={
+                  alertsGranted
+                    ? "Alerts enabled"
+                    : alertsBlocked
+                      ? "Alerts blocked in browser"
+                      : "Enable finish alerts"
+                }
+                disabled={!alertsAvailable}
+              >
+                {alertsGranted ? (
+                  <Bell className="w-4 h-4" />
+                ) : (
+                  <BellOff className="w-4 h-4" />
+                )}
+              </button>
+            </div>
 
-            {sprint.status === "paused" && (
-              <>
-                <Button
-                  type="button"
-                  onClick={handleResume}
-                  className="flex-1 h-12 rounded-xl font-bold text-sm gap-2 v2-glow-btn"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, var(--v2-amber-500), var(--v2-amber-600))",
-                    color: "var(--v2-obsidian-900)",
-                    fontFamily: "var(--font-body)",
-                    border: "none",
-                  }}
-                >
-                  <Play className="w-4 h-4 fill-current" />
-                  Resume
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={handleFinishNow}
-                  className="flex-1 h-12 rounded-xl font-bold text-sm gap-2 border"
-                  style={{
-                    borderColor: "oklch(0.62 0.14 155 / 24%)",
-                    background: "oklch(0.62 0.14 155 / 8%)",
-                    color: "var(--v2-sage-400)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  <Flag className="w-4 h-4" />
-                  Finish Now
-                </Button>
-              </>
+            {alertError && (
+              <p className="sprint-alert-error">{alertError}</p>
             )}
+          </>
+        )}
 
-            {completionReady && (
-              <>
-                <Button
-                  type="button"
-                  onClick={() => setIsDialogOpen(true)}
-                  className="flex-1 h-12 rounded-xl font-bold text-sm gap-2"
-                  style={{
-                    background:
-                      "linear-gradient(135deg, var(--v2-sage-500), var(--v2-sage-400))",
-                    color: "var(--v2-obsidian-900)",
-                    fontFamily: "var(--font-body)",
-                    border: "none",
-                  }}
-                >
-                  <Sparkles className="w-4 h-4" />
-                  Add Check-In
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={resetToIdle}
-                  className="flex-1 h-12 rounded-xl font-bold text-sm gap-2 border"
-                  style={{
-                    borderColor: "var(--v2-border-strong)",
-                    background: "var(--v2-surface-raised)",
-                    color: "var(--v2-text-secondary)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  <TimerReset className="w-4 h-4" />
-                  Discard Draft
-                </Button>
-              </>
-            )}
+        {/* ─── RUNNING / PAUSED STATE ─── */}
+        {isSprintLive && (
+          <>
+            <div className="sprint-live-header">
+              <span className="sprint-live-cat">{sprint.category}</span>
+              <span className={`sprint-live-badge ${sprint.status === "running" ? "running" : "paused"}`}>
+                {sprint.status === "running" ? "LIVE" : "PAUSED"}
+              </span>
+            </div>
 
-            {isSprintLive && (
+            <div className="sprint-timer-display live">
+              <span className="sprint-timer-value">
+                {formatCountdown(remainingMs)}
+              </span>
+            </div>
+
+            {/* Progress bar */}
+            <div className="sprint-progress-track">
+              <div
+                className="sprint-progress-fill"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+            <div className="sprint-progress-meta">
+              <span>{formatMinutesLabel(activeMinutes)} elapsed</span>
+              <span>{formatMinutesLabel(sprint.plannedMinutes)} planned</span>
+            </div>
+
+            {/* Controls */}
+            <div className="sprint-live-controls">
+              {sprint.status === "running" ? (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={handlePause}
+                    className="sprint-ctrl-btn outline"
+                  >
+                    <Pause className="w-4 h-4 fill-current" />
+                    Pause
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleFinishNow}
+                    className="sprint-ctrl-btn finish"
+                  >
+                    <Flag className="w-4 h-4" />
+                    Finish
+                  </Button>
+                </>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    onClick={handleResume}
+                    className="sprint-ctrl-btn primary v2-glow-btn"
+                  >
+                    <Play className="w-4 h-4 fill-current" />
+                    Resume
+                  </Button>
+                  <Button
+                    type="button"
+                    onClick={handleFinishNow}
+                    className="sprint-ctrl-btn finish"
+                  >
+                    <Flag className="w-4 h-4" />
+                    Finish
+                  </Button>
+                </>
+              )}
               <Button
                 type="button"
                 variant="outline"
                 onClick={resetToIdle}
-                className="h-12 rounded-xl font-bold text-sm gap-2 border"
-                style={{
-                  borderColor: "oklch(0.60 0.20 18 / 24%)",
-                  background: "oklch(0.60 0.20 18 / 7%)",
-                  color: "var(--v2-rose-400)",
-                  fontFamily: "var(--font-body)",
-                }}
+                className="sprint-ctrl-btn cancel"
               >
-                <Square className="w-4 h-4 fill-current" />
-                Cancel
+                <Square className="w-3.5 h-3.5 fill-current" />
               </Button>
-            )}
-          </div>
-
-          {completionReady && !isDialogOpen && (
-            <div
-              className="mt-5 rounded-2xl border p-4"
-              style={{
-                borderColor: "oklch(0.65 0.19 60 / 18%)",
-                background: "oklch(0.65 0.19 60 / 5%)",
-              }}
-            >
-              <div className="flex items-start gap-3">
-                <CheckCircle2
-                  className="w-4 h-4 mt-0.5"
-                  style={{ color: "var(--v2-sage-400)" }}
-                />
-                <div>
-                  <p
-                    className="text-sm font-semibold mb-1"
-                    style={{
-                      color: "var(--v2-text-primary)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    Sprint complete. Your draft is being held here.
-                  </p>
-                  <p
-                    className="text-xs leading-relaxed"
-                    style={{
-                      color: "var(--v2-text-secondary)",
-                      fontFamily: "var(--font-body)",
-                    }}
-                  >
-                    Re-open the check-in dialog anytime. The note stays recoverable until you save or discard it.
-                  </p>
-                </div>
-              </div>
             </div>
-          )}
+          </>
+        )}
 
-          {savedMeta && completionBullets.length > 0 && (
-            <div
-              className="mt-6 border-t px-0 pt-5"
-              style={{ borderColor: "oklch(0.62 0.14 155 / 20%)" }}
-            >
-              <div className="flex items-center gap-2 mb-3">
-                <CheckCircle2
-                  className="w-4 h-4"
-                  style={{ color: "var(--v2-sage-400)" }}
-                />
-                <span
-                  className="text-sm font-bold tracking-tight"
-                  style={{
-                    color: "var(--v2-sage-400)",
-                    fontFamily: "var(--font-display)",
-                  }}
-                >
-                  Sprint Logged
-                </span>
-                <span
-                  className="text-[10px] font-semibold uppercase tracking-[0.15em]"
-                  style={{
-                    color: "var(--v2-text-muted)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  {savedMeta.actualMinutes}m / {savedMeta.plannedMinutes}m
-                </span>
-              </div>
-              <ul
-                className="text-sm space-y-1.5 list-disc list-inside"
-                style={{
-                  color: "var(--v2-text-secondary)",
-                  fontFamily: "var(--font-body)",
-                }}
+        {/* ─── COMPLETION STATE (card, before dialog) ─── */}
+        {completionReady && (
+          <>
+            <div className="sprint-done-header">
+              <CheckCircle2 className="w-4 h-4" style={{ color: "var(--v2-sage-400)" }} />
+              <span>Sprint done</span>
+              <span className="sprint-done-time">
+                {roundElapsedMinutes(sprint.accumulatedActiveMs)}m / {sprint.plannedMinutes}m
+              </span>
+            </div>
+
+            <div className="sprint-done-controls">
+              <Button
+                type="button"
+                onClick={() => setIsDialogOpen(true)}
+                className="sprint-ctrl-btn primary v2-glow-btn"
               >
-                {completionBullets.map((bullet) => (
-                  <li key={bullet} className="leading-relaxed pl-1">
-                    {bullet}
-                  </li>
-                ))}
-              </ul>
+                <Sparkles className="w-4 h-4" />
+                Check In
+              </Button>
+              <div className="sprint-done-extend">
+                <button
+                  type="button"
+                  onClick={() => handleAddMoreTime(5)}
+                  className="sprint-extend-chip"
+                >+5m</button>
+                <button
+                  type="button"
+                  onClick={() => handleAddMoreTime(15)}
+                  className="sprint-extend-chip"
+                >+15m</button>
+              </div>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={resetToIdle}
+                className="sprint-ctrl-btn outline"
+              >
+                <TimerReset className="w-4 h-4" />
+                Discard
+              </Button>
             </div>
-          )}
-        </div>
-      </Card>
+          </>
+        )}
 
+        {/* Saved summary toast */}
+        {savedMeta && completionBullets.length > 0 && (
+          <div className="sprint-saved-toast">
+            <div className="sprint-saved-header">
+              <CheckCircle2 className="w-3.5 h-3.5" style={{ color: "var(--v2-sage-400)" }} />
+              <span>Logged</span>
+              <span className="sprint-saved-meta">
+                {savedMeta.actualMinutes}m / {savedMeta.plannedMinutes}m
+              </span>
+            </div>
+            <ul className="sprint-saved-list">
+              {completionBullets.map((bullet) => (
+                <li key={bullet}>{bullet}</li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
+
+      {/* ─── SPRINT CHECK-IN DIALOG ─── */}
       <Dialog
         open={isDialogOpen}
         onOpenChange={(open) => {
@@ -1384,152 +1012,69 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
         }}
       >
         <DialogContent
-          className="max-w-2xl border p-0 overflow-hidden"
-          style={{
-            background:
-              "linear-gradient(180deg, oklch(0.16 0.01 260), oklch(0.12 0.008 260))",
-            borderColor: "var(--v2-border)",
-          }}
+          className="sprint-dialog"
         >
-          <div className="p-6 md:p-7">
-            <DialogHeader className="mb-5">
-              <DialogTitle
-                className="text-xl md:text-2xl font-bold tracking-tight"
-                style={{ fontFamily: "var(--font-display)", color: "var(--v2-text-primary)" }}
-              >
-                What did you finish in this sprint?
+          <div className="sprint-dialog-body">
+            <DialogHeader className="sprint-dialog-header">
+              <DialogTitle className="sprint-dialog-title">
+                Sprint Check-in
               </DialogTitle>
-              <DialogDescription
-                className="max-w-xl text-base leading-relaxed"
-                style={{
-                  color: "var(--v2-text-secondary)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                Capture the outcome, then DiscipLog will summarize and file it automatically.
+              <DialogDescription className="sprint-dialog-desc">
+                Capture what you shipped, then we&apos;ll summarize and file it.
               </DialogDescription>
             </DialogHeader>
 
-            <div className="flex flex-wrap items-center gap-2 mb-5">
-              <Badge
-                variant="outline"
-                className="px-3 py-1.5 border"
-                style={{
-                  borderColor: "var(--v2-border)",
-                  background: "var(--v2-surface-raised)",
-                  color: "var(--v2-text-secondary)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                Planned: {sprint.plannedMinutes}m
-              </Badge>
-              <Badge
-                variant="outline"
-                className="px-3 py-1.5 border"
-                style={{
-                  borderColor: "oklch(0.65 0.19 60 / 20%)",
-                  background: "oklch(0.65 0.19 60 / 8%)",
-                  color: "var(--v2-amber-300)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
+            {/* Meta badges */}
+            <div className="sprint-dialog-meta">
+              <span className="sprint-meta-badge sage">
+                {roundElapsedMinutes(sprint.accumulatedActiveMs)}m done
+              </span>
+              <span className="sprint-meta-badge muted">
+                {sprint.plannedMinutes}m planned
+              </span>
+              <span className="sprint-meta-badge amber">
                 {sprint.category}
-              </Badge>
+              </span>
             </div>
 
-            <div className="mb-6">
-              <label
-                className="text-[10px] font-bold uppercase tracking-[0.15em] mb-3 block"
-                style={{
-                  color: "var(--v2-text-muted)",
-                  fontFamily: "var(--font-body)",
-                }}
-              >
-                Sprint Category
-              </label>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                {categories.map((cat) => {
-                  const isActive = sprint.category === cat.name;
-
-                  return (
-                    <Button
-                      key={cat.name}
-                      type="button"
-                      variant="outline"
-                      onClick={() => updateSprintConfig(cat.name)}
-                      className="h-11 rounded-xl justify-center border text-xs sm:text-sm font-semibold gap-1.5"
-                      style={{
-                        borderColor: isActive
-                          ? "oklch(0.65 0.19 60 / 24%)"
-                          : "var(--v2-border-strong)",
-                        background: isActive
-                          ? "linear-gradient(135deg, var(--v2-amber-500), var(--v2-amber-400))"
-                          : "var(--v2-surface-raised)",
-                        color: isActive
-                          ? "var(--v2-obsidian-900)"
-                          : "var(--v2-text-secondary)",
-                        fontFamily: "var(--font-body)",
-                      }}
-                    >
-                      <DynamicIcon name={cat.icon} className="w-3.5 h-3.5" />
-                      {cat.name}
-                    </Button>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="mb-2">
-              <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-                <label
-                  className="text-[10px] font-bold uppercase tracking-[0.15em]"
-                  style={{
-                    color: "var(--v2-text-muted)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  Sprint Notes
-                </label>
-
-                <div className="flex items-center gap-2 ml-auto">
-                  <span
-                    className="text-[11px] font-medium"
-                    style={{
-                      color: "var(--v2-obsidian-300)",
-                      fontFamily: "var(--font-body)",
-                    }}
+            {/* Category selector */}
+            <div className="sprint-dialog-cats">
+              {categories.map((cat) => {
+                const isActive = sprint.category === cat.name;
+                return (
+                  <button
+                    key={cat.name}
+                    type="button"
+                    onClick={() => updateSprintConfig(cat.name)}
+                    className={`sprint-dialog-cat-btn ${isActive ? "active" : ""}`}
                   >
-                    {sprint.checkInText.length} chars
-                  </span>
-                  {supported && (
-                    <Button
-                      type="button"
-                      variant="outline"
-                      size="sm"
-                      onClick={handleVoiceToggle}
-                      className="rounded-xl border px-3"
-                      style={{
-                        borderColor: isListening
-                          ? "var(--v2-amber-400)"
-                          : "var(--v2-border-strong)",
-                        background: isListening
-                          ? "oklch(0.65 0.19 60 / 8%)"
-                          : "var(--v2-surface-raised)",
-                        color: isListening
-                          ? "var(--v2-amber-300)"
-                          : "var(--v2-text-secondary)",
-                        fontFamily: "var(--font-body)",
-                      }}
-                    >
-                      {isListening ? (
-                        <Square className="w-4 h-4 fill-current" />
-                      ) : (
-                        <Mic className="w-4 h-4" />
-                      )}
-                      {isListening ? "Stop" : "Dictate"}
-                    </Button>
-                  )}
-                </div>
+                    <DynamicIcon name={cat.icon} className="w-3.5 h-3.5" />
+                    {cat.name}
+                  </button>
+                );
+              })}
+            </div>
+
+            {/* Notes */}
+            <div className="sprint-dialog-notes">
+              <div className="sprint-dialog-notes-header">
+                <span className="sprint-dialog-notes-count">
+                  {sprint.checkInText.length}
+                </span>
+                {supported && (
+                  <button
+                    type="button"
+                    onClick={handleVoiceToggle}
+                    className={`sprint-dialog-mic ${isListening ? "active" : ""}`}
+                  >
+                    {isListening ? (
+                      <Square className="w-3.5 h-3.5 fill-current" />
+                    ) : (
+                      <Mic className="w-3.5 h-3.5" />
+                    )}
+                    {isListening ? "Stop" : "Dictate"}
+                  </button>
+                )}
               </div>
 
               <Textarea
@@ -1541,83 +1086,91 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
                       : prev
                   )
                 }
-                placeholder="What got done? Mention output, blockers, decisions, or what changed."
-                className="min-h-[220px] resize-none rounded-2xl border text-base leading-relaxed"
+                placeholder="What got done? Output, blockers, decisions…"
+                className="sprint-dialog-textarea"
                 style={{
-                  background: "var(--v2-surface-raised)",
                   borderColor: isListening
                     ? "var(--v2-amber-400)"
                     : "var(--v2-border)",
-                  color: "var(--v2-text-primary)",
-                  fontFamily: "var(--font-body)",
                 }}
               />
             </div>
 
+            {/* Error */}
             {saveError && (
-              <div
-                className="mt-4 rounded-2xl border px-4 py-3 flex items-start gap-3"
-                style={{
-                  borderColor: "oklch(0.60 0.20 18 / 20%)",
-                  background: "oklch(0.60 0.20 18 / 5%)",
-                }}
-              >
-                <AlertCircle
-                  className="w-4 h-4 mt-0.5"
-                  style={{ color: "var(--v2-rose-400)" }}
-                />
-                <p
-                  className="text-sm leading-relaxed"
-                  style={{
-                    color: "var(--v2-text-secondary)",
-                    fontFamily: "var(--font-body)",
-                  }}
-                >
-                  {saveError}
-                </p>
+              <div className="sprint-dialog-error">
+                <AlertCircle className="w-4 h-4" style={{ color: "var(--v2-rose-400)" }} />
+                <p>{saveError}</p>
               </div>
             )}
+
+            {/* Need more time */}
+            <div className="sprint-dialog-extend">
+              <span className="sprint-dialog-extend-label">Need more time?</span>
+              <div className="sprint-dialog-extend-btns">
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => handleAddMoreTime(5)}
+                  className="sprint-extend-chip"
+                >+5m</button>
+                <button
+                  type="button"
+                  disabled={isSaving}
+                  onClick={() => handleAddMoreTime(15)}
+                  className="sprint-extend-chip"
+                >+15m</button>
+                <div className="sprint-dialog-extend-custom">
+                  <Input
+                    inputMode="numeric"
+                    placeholder="m"
+                    value={incrementMinutesInput}
+                    disabled={isSaving}
+                    onChange={(event) => setIncrementMinutesInput(event.target.value.replace(/[^\d]/g, ""))}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") handleAddCustomTime();
+                    }}
+                    className="sprint-dialog-extend-input"
+                  />
+                  <button
+                    type="button"
+                    disabled={!incrementMinutesInput || isSaving}
+                    onClick={handleAddCustomTime}
+                    className="sprint-dialog-extend-go"
+                    style={{
+                      background: !incrementMinutesInput ? "transparent" : "var(--v2-amber-500)",
+                      color: !incrementMinutesInput ? "var(--v2-text-muted)" : "var(--v2-obsidian-900)"
+                    }}
+                  >
+                    <Play className="w-3 h-3 fill-current" />
+                  </button>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <DialogFooter
-            className="border-t"
-            style={{
-              borderColor: "var(--v2-border)",
-              background: "oklch(0.10 0.006 260 / 60%)",
-            }}
-          >
+          <DialogFooter className="sprint-dialog-footer">
             <Button
               type="button"
               variant="outline"
               disabled={isSaving}
               onClick={resetToIdle}
-              style={{
-                borderColor: "var(--v2-border-strong)",
-                background: "var(--v2-surface-raised)",
-                color: "var(--v2-text-secondary)",
-                fontFamily: "var(--font-body)",
-              }}
+              className="sprint-dialog-discard"
             >
-              Discard Draft
+              Discard
             </Button>
             <Button
               type="button"
               disabled={!sprint.checkInText.trim() || isSaving}
               onClick={handleSaveSprint}
-              style={{
-                background:
-                  "linear-gradient(135deg, var(--v2-amber-500), var(--v2-amber-600))",
-                color: "var(--v2-obsidian-900)",
-                fontFamily: "var(--font-body)",
-                border: "none",
-              }}
+              className="sprint-dialog-save v2-glow-btn"
             >
               {isSaving ? (
                 <Loader2 className="w-4 h-4 animate-spin" />
               ) : (
                 <Sparkles className="w-4 h-4" />
               )}
-              {isSaving ? "Summarizing..." : "Summarize & Save"}
+              {isSaving ? "Saving…" : "Summarize & Save"}
             </Button>
           </DialogFooter>
         </DialogContent>

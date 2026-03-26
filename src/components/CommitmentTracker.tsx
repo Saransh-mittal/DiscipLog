@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
-import { Card } from "@/components/ui/card";
+import WorldCard from "@/components/WorldCard";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -115,18 +115,15 @@ export default function CommitmentTracker() {
   const resolved = commitments.filter((c) => c.status !== "pending");
 
   return (
-    <Card
-      className="relative overflow-hidden p-0 border"
-      style={{
-        background: "var(--v2-surface)",
-        borderColor: "var(--v2-border)",
-      }}
+    <WorldCard
+      className="relative overflow-hidden"
+      style={{ padding: 0 }}
     >
       <div
         className="h-[2px] w-full"
         style={{
           background:
-            "linear-gradient(90deg, var(--v2-amber-500), var(--v2-amber-300), var(--v2-amber-500))",
+            "linear-gradient(90deg, var(--world-accent, var(--v2-amber-500)), color-mix(in oklch, var(--world-accent, var(--v2-amber-300)) 80%, white), var(--world-accent, var(--v2-amber-500)))",
         }}
       />
 
@@ -135,7 +132,7 @@ export default function CommitmentTracker() {
           <div className="flex items-center gap-2">
             <Target
               className="h-4 w-4"
-              style={{ color: "var(--v2-amber-400)" }}
+              style={{ color: "var(--world-accent, var(--v2-amber-400))" }}
             />
             <h3
               className="text-lg font-bold tracking-tight"
@@ -149,10 +146,10 @@ export default function CommitmentTracker() {
             className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors"
             style={{
               background: showInput
-                ? "oklch(0.65 0.19 60 / 10%)"
+                ? "color-mix(in oklch, var(--world-accent) 10%, transparent)"
                 : "var(--v2-surface-raised)",
               color: showInput
-                ? "var(--v2-amber-400)"
+                ? "var(--world-accent, var(--v2-amber-400))"
                 : "var(--v2-text-muted)",
               fontFamily: "var(--font-body)",
             }}
@@ -189,7 +186,7 @@ export default function CommitmentTracker() {
               className="h-10 rounded-lg px-4 text-xs font-bold"
               style={{
                 background:
-                  "linear-gradient(135deg, var(--v2-amber-500), var(--v2-amber-600))",
+                  "linear-gradient(135deg, var(--world-accent, var(--v2-amber-500)), color-mix(in oklch, var(--world-accent, var(--v2-amber-600)) 80%, black))",
                 color: "var(--v2-obsidian-900)",
                 border: "none",
                 fontFamily: "var(--font-body)",
@@ -308,7 +305,7 @@ export default function CommitmentTracker() {
                       className="h-auto self-end rounded-lg px-3 py-2 text-[10px] font-bold"
                       style={{
                         background:
-                          "linear-gradient(135deg, var(--v2-amber-500), var(--v2-amber-600))",
+                          "linear-gradient(135deg, var(--world-accent, var(--v2-amber-500)), color-mix(in oklch, var(--world-accent, var(--v2-amber-600)) 80%, black))",
                         color: "var(--v2-obsidian-900)",
                         border: "none",
                         fontFamily: "var(--font-body)",
@@ -394,6 +391,6 @@ export default function CommitmentTracker() {
           </div>
         )}
       </div>
-    </Card>
+    </WorldCard>
   );
 }

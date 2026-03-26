@@ -4,6 +4,10 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import connectToDatabase from "@/lib/mongoose";
 import ErrorLog from "@/models/ErrorLog";
 import LogEntry from "@/models/LogEntry";
+import {
+  scheduleCoachEmbeddingBackfill,
+  scheduleCoachEmbeddingRefreshForLog,
+} from "@/lib/coach-embeddings";
 import { generateLogSummary } from "@/lib/log-summary";
 
 function getErrorMessage(error: unknown) {
@@ -48,6 +52,8 @@ export async function POST(
     // Save back to DB
     log.aiSummary = summary;
     await log.save();
+    scheduleCoachEmbeddingRefreshForLog(String(log._id));
+    scheduleCoachEmbeddingBackfill(userId);
 
     return NextResponse.json({ summary });
   } catch (error: unknown) {

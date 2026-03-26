@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { format, subWeeks, eachDayOfInterval, startOfWeek, addDays } from "date-fns";
-import { Card } from "@/components/ui/card";
+import WorldCard from "@/components/WorldCard";
 import {
   Tooltip,
   TooltipContent,
@@ -33,24 +33,24 @@ const INTENSITY_STYLES: Record<number, { bg: string; border: string }> = {
     border: "var(--v2-border)",
   },
   1: {
-    bg: "oklch(0.65 0.19 60 / 10%)",
-    border: "oklch(0.65 0.19 60 / 15%)",
+    bg: "color-mix(in oklch, var(--world-accent) 10%, transparent)",
+    border: "color-mix(in oklch, var(--world-accent) 15%, transparent)",
   },
   2: {
-    bg: "oklch(0.65 0.19 60 / 22%)",
-    border: "oklch(0.65 0.19 60 / 28%)",
+    bg: "color-mix(in oklch, var(--world-accent) 22%, transparent)",
+    border: "color-mix(in oklch, var(--world-accent) 28%, transparent)",
   },
   3: {
-    bg: "oklch(0.65 0.19 60 / 38%)",
-    border: "oklch(0.65 0.19 60 / 42%)",
+    bg: "color-mix(in oklch, var(--world-accent) 38%, transparent)",
+    border: "color-mix(in oklch, var(--world-accent) 42%, transparent)",
   },
   4: {
-    bg: "oklch(0.65 0.19 60 / 55%)",
-    border: "oklch(0.65 0.19 60 / 60%)",
+    bg: "color-mix(in oklch, var(--world-accent) 55%, transparent)",
+    border: "color-mix(in oklch, var(--world-accent) 60%, transparent)",
   },
   5: {
-    bg: "var(--v2-amber-400)",
-    border: "var(--v2-amber-300)",
+    bg: "var(--world-accent, var(--v2-amber-400))",
+    border: "color-mix(in oklch, var(--world-accent) 90%, white)",
   },
 };
 
@@ -106,19 +106,16 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
   const activeDays = Object.keys(dailyTotals).length;
 
   return (
-    <Card
-      className="relative overflow-hidden p-0 border h-full flex flex-col"
-      style={{
-        background: "var(--v2-surface)",
-        borderColor: "var(--v2-border)",
-      }}
+    <WorldCard
+      className="relative overflow-hidden h-full flex flex-col"
+      style={{ padding: 0 }}
     >
       {/* Top accent */}
       <div
         className="h-[2px] w-full"
         style={{
           background:
-            "linear-gradient(90deg, var(--v2-amber-500), var(--v2-amber-300), var(--v2-amber-500))",
+            "linear-gradient(90deg, var(--world-accent, var(--v2-amber-500)), color-mix(in oklch, var(--world-accent, var(--v2-amber-300)) 80%, white), var(--world-accent, var(--v2-amber-500)))",
         }}
       />
 
@@ -229,7 +226,7 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
                                 opacity: isFuture ? 0.3 : 1,
                                 boxShadow:
                                   intensity === 5
-                                    ? "0 0 8px oklch(0.65 0.19 60 / 30%)"
+                                    ? "0 0 8px var(--world-accent-glow, oklch(0.65 0.19 60 / 30%))"
                                     : "none",
                               }}
                             />
@@ -243,7 +240,7 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
                               fontFamily: "var(--font-body)",
                             }}
                           >
-                            <span className="font-bold" style={{ color: "var(--v2-amber-300)" }}>
+                            <span className="font-bold" style={{ color: "var(--world-accent, var(--v2-amber-300))" }}>
                               {hours}h
                             </span>{" "}
                             on {format(day, "MMM d, yyyy")}
@@ -304,13 +301,13 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
                 }}
               >
                 <span>
-                  <span style={{ color: "var(--v2-amber-300)" }}>
-                    {totalHours}
+                  <span style={{ color: "var(--world-accent, var(--v2-amber-300))" }}>
+                    {totalHours.toFixed(2)}
                   </span>{" "}
                   total hours
                 </span>
                 <span>
-                  <span style={{ color: "var(--v2-amber-300)" }}>
+                  <span style={{ color: "var(--world-accent, var(--v2-amber-300))" }}>
                     {activeDays}
                   </span>{" "}
                   active days
@@ -320,6 +317,6 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
           </>
         )}
       </div>
-    </Card>
+    </WorldCard>
   );
 }

@@ -11,6 +11,12 @@ import {
   isValidTimezone,
   parseLogInstant,
 } from "@/lib/logs";
+import {
+  scheduleCoachEmbeddingBackfill,
+  scheduleCoachEmbeddingRefreshForLog,
+} from "@/lib/coach-embeddings";
+import { scheduleImplicitMemoryRefreshFromLog } from "@/lib/implicit-memory";
+import { scheduleUsagePatternRecalc } from "@/lib/usage-patterns";
 
 function parsePositiveNumber(value: unknown): number | null {
   const parsed = Number(value);
@@ -118,7 +124,13 @@ export async function POST(req: Request) {
       ...payload,
     });
 
-    return NextResponse.json(log);
+    const response = NextResponse.json(log);
+    scheduleCoachEmbeddingRefreshForLog(String(log._id));
+    scheduleCoachEmbeddingBackfill(userId);
+    scheduleImplicitMemoryRefreshFromLog(userId);
+    scheduleUsagePatternRecalc(userId, resolvedTimezone);
+
+    return response;
   } catch (error: unknown) {
     console.error("[LOGS_POST_ERROR]", error);
     

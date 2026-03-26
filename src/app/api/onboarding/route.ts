@@ -6,6 +6,7 @@ import { openai } from "@ai-sdk/openai";
 import connectToDatabase from "@/lib/mongoose";
 import User from "@/models/User";
 import { ALLOWED_ICONS } from "@/lib/icons";
+import { parseExplicitAIProfile } from "@/lib/ai-profile";
 
 const ICON_LIST = ALLOWED_ICONS.join(", ");
 
@@ -68,7 +69,7 @@ export async function PATCH(req: Request) {
     }
 
     const userId = (session.user as { id: string }).id;
-    const { categories } = await req.json();
+    const { categories, aiProfile } = await req.json();
 
     if (!Array.isArray(categories) || categories.length === 0) {
       return new NextResponse("At least one category required", { status: 400 });
@@ -78,11 +79,28 @@ export async function PATCH(req: Request) {
       return new NextResponse("Maximum 7 categories allowed", { status: 400 });
     }
 
+    const parsedProfile = parseExplicitAIProfile(aiProfile, {
+      requirePersona: true,
+    });
+
+    if (!parsedProfile.ok) {
+      return new NextResponse(parsedProfile.error, { status: 400 });
+    }
+
     await connectToDatabase();
     const user = await User.findByIdAndUpdate(
       userId,
-      { categories, onboardingCompleted: true },
-      { new: true, runValidators: true }
+      {
+        $set: {
+          categories,
+          "aiProfile.persona": parsedProfile.value.persona,
+          "aiProfile.coreWhy": parsedProfile.value.coreWhy,
+          "aiProfile.customInstructions":
+            parsedProfile.value.customInstructions,
+          onboardingCompleted: true,
+        },
+      },
+      { returnDocument: "after", runValidators: true }
     );
 
     if (!user) {

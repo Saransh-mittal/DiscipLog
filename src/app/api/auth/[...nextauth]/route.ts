@@ -11,10 +11,10 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   callbacks: {
-    async signIn({ user, account, profile }) {
+    async signIn({ user }) {
       try {
         await connectToDatabase();
-        let existingUser = await User.findOne({ email: user.email });
+        const existingUser = await User.findOne({ email: user.email });
         
         if (!existingUser) {
           await User.create({
@@ -29,13 +29,14 @@ export const authOptions: NextAuthOptions = {
         return false;
       }
     },
-    async session({ session, token }) {
+    async session({ session }) {
       if (session.user) {
         await connectToDatabase();
         const dbUser = await User.findOne({ email: session.user.email });
         if (dbUser) {
           // Expose the MongoDB Object ID as string on the user object for querying logs
-          (session.user as any).id = dbUser._id.toString();
+          (session.user as typeof session.user & { id?: string }).id =
+            dbUser._id.toString();
         }
       }
       return session;
@@ -43,6 +44,10 @@ export const authOptions: NextAuthOptions = {
   },
   session: {
     strategy: "jwt",
+  },
+  pages: {
+    signIn: '/signin',
+    signOut: '/signout',
   },
   secret: process.env.NEXTAUTH_SECRET,
 };

@@ -28,17 +28,25 @@ Text collection interface.
 - Components use semantic CSS variables (`var(--v2-surface-...)`) defined in `globals-v2.css` to seamlessly support both themes.
 
 ### `DashboardNav`
-- Client-side navigation tabs used in the dashboard header to switch between "Overview" (`/dashboard`), "Log" (`/dashboard/log`), "History" (`/dashboard/history`), and "Settings" (`/dashboard/settings`).
+- Client-side navigation tabs used in the dashboard header to switch between "Overview" (`/dashboard`), "Log" (`/dashboard/log`), "History" (`/dashboard/history`), "Settings" (`/dashboard/settings`), and conditionally "Archive" (when past debriefs exist).
+
+### `DashboardClientShell`
+- Client-side wrapper for the dashboard layout that manages global navigation state, debrief interstitials, and provider composition (Categories, Logs, Momentum).
 
 ### `CategoriesProvider` & `DynamicIcon`
 - `CategoriesProvider` fetches the active user's `categories` array from the database and exposes it via React Context to all dashboard and logging components.
 - `DynamicIcon` is a wrapper around `lucide-react` that dynamically renders an icon from a string name, utilizing a curated 40-icon whitelist for AI suggestions and a fallback icon if missing.
+
+### `LogsProvider`
+- React context provider that fetches and caches the user's `LogEntry` array, exposing it to all dashboard children via context.
+- Provides a `refreshLogs()` method for re-fetching after creates/edits/deletes.
 
 ### `OnboardingFlow`
 - A minimal, two-step AI-driven setup screen.
 - Step 1: User provides a free-text description of how they spend their time.
 - Step 2: Renders an editable array of category cards (auto-populated by OpenAI) containing names, AI-suggested icons, and daily/weekly tracking targets. Validates constraints (max 7) before saving.
 - Located at `/onboarding`, completely outside the dashboard layout.
+
 ### `LoggerV2`
 Manual voice / text entry point. Interfaces with the shared Web Speech hook, exposes a custom hours stepper, and saves standard `"manual"` log entries after AI summarization.
 - Uses `/api/summarize`, which delegates to the shared `generateLogSummary` helper.
@@ -82,7 +90,7 @@ Dedicated V2 modal for post-save log management.
 
 ### `LogHistoryV2` (Terminal Ledger)
 Chronological feed displaying historical work logs broken down into "All Sessions", "This Week", and "Today" tabs (rendered deeply on `/dashboard/history`). 
-- Automatically styles AI summaries using a custom Markdown parser.
+- Automatically styles AI summaries using the `ChatMarkdown` parser.
 - Displays timestamps using `loggedAt ?? createdAt`.
 - Includes a graceful degradation fallback displaying truncated raw transcripts if an AI summary is missing.
 - Exposes `Edit` and `Delete` actions per card.
@@ -93,8 +101,71 @@ Chronological feed displaying historical work logs broken down into "All Session
 ### `AIAssistantV2`
 - Floating productivity coach panel powered by **OpenAI (`gpt-5-nano`)**. 
 - Integrated with `@ai-sdk/react` (`useChat`) for robust real-time streaming capability via `toUIMessageStreamResponse()` and `smoothStream()` pacing.
+- **Tool-Calling UI:** Parses streamed tool parts (`tool-searchHistoricalLogs`, `tool-getCoachStats`) into structured `ToolCallData` objects and renders them as expandable accordion cards via `ToolCallAccordion`.
 - **Premium UI/UX:** Boasts a glassmorphic aesthetic inspired by modern design trends, including animated "Thinking..." bouncing dots during reasoning phases, fade-in message entrance animations, an active blinking cursor during generation, and continuous `requestAnimationFrame` auto-scrolling.
 - **Dynamic Context:** Automatically tracks user state and binds the latest manual and sprint logs, user-defined category targets, active weekly commitments, and timezone to the `sendMessage` body payload on every request, ensuring the AI insights are aggressively up-to-date and temporally accurate.
 
+### `ToolCallAccordion`
+- Renders AI Coach tool activity as expandable accordion cards within the chat feed.
+- Displays loading/success/error states with structured detail: query, resolved categories, advisory labels, topic terms, intent tags, retrieval mode, date coverage, and match counts.
+
+### `ChatMarkdown`
+- Custom Markdown renderer for AI chat responses and log summaries.
+- Renders standard markdown elements (bold, italic, lists, code blocks) with DiscipLog-styled typography.
+
+### `SmartRecallFeed`
+- Semantic search interface for the "Recall" tab.
+- Takes a user query, sends to `/api/recall`, and displays ranked historical log matches.
+- Shows a polished empty state UI when no logs match.
+- Renders match relevance scores and contextual highlights.
+
+### `MomentumProvider` & `MomentumFlame`
+- `MomentumProvider` computes `streakPower` and `dailyEnergy` from the user's logging history, exposing these values via React context.
+- `MomentumFlame` renders an animated flame icon whose intensity and color shift with the user's current momentum level.
+
+### `WorldCard`
+- Thin wrapper component that auto-applies world-tier styling: background, border, shadow, border-radius, hover lift, glow, ripple, and card entrance animations.
+- Delegates to the active world skin via the Momentum system.
+
+### `CompletionCelebration`
+- Animated celebration overlay triggered when a user completes a sprint or logs a session.
+
+### `SoundManager`
+- Manages audio playback for sprint timer completion beeps and notification sounds.
+
+### `FrictionBanner`
+- Prominent in-app banner that appears when the user has an un-dismissed nudge.
+- Displays the LLM-generated motivational message with a CTA button.
+- Animates out when dismissed (fires `PATCH /api/nudges/[id]/dismiss`).
+
+### `WeeklyDebriefModal`
+- Full-screen, cinematic glassmorphic modal for the weekly performance debrief.
+- Staggered-entry animation for each metric section.
+- Displays: dramatic week title, total hours, consistency %, best day, category breakdown with progress bars and trend arrows, coach note, MVP category, hardest day, and next-week micro-challenge.
+- Internal scroll for overflow prevention. Acknowledges on dismiss via `PATCH /api/debriefs/[id]/acknowledge`.
+
+### `DebriefArchive`
+- Historical archive view of all past weekly debriefs.
+- Shows each debrief as a card with key metrics and category breakdowns.
+- Progress bar colors dynamically match the active world-tier accent.
+- Accessible from the "Archive" tab in `DashboardNav` (only visible when past debriefs exist).
+
+### `EndOfDayMicroReview`
+- Lightweight end-of-day review component that prompts users for quick reflections on their day's sessions.
+
 ### `GlobalErrorBoundaryV2`
 Terminal-styled error boundary that provides localized graceful degradation. Captures stack traces, renders a user-friendly crash screen, and allows users to submit context directly to the MongoDB error sink.
+
+## Custom Hooks
+
+### `useSpeechRecognition`
+- Custom React hook wrapping the Web Speech API for voice-to-text dictation.
+- Used by `LoggerV2` and `SprintTimerCard` for transcript input.
+
+### `usePushNotifications`
+- Custom React hook managing Web Push subscription lifecycle.
+- Handles permission requests, subscription creation/deletion, and sync with `/api/push/subscribe` and `/api/push/unsubscribe`.
+
+### `useMomentumClasses`
+- Returns computed CSS class names (`cardClasses`, `entranceClass`, `allClasses`) and `microInteractions` state based on the active world tier.
+- Used by components that need tier-aware styling without wrapping in `WorldCard`.

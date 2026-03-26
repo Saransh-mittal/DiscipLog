@@ -9,6 +9,10 @@ import {
   isValidTimezone,
   parseLogInstant,
 } from "@/lib/logs";
+import {
+  scheduleCoachEmbeddingBackfill,
+  scheduleCoachEmbeddingRefreshForLog,
+} from "@/lib/coach-embeddings";
 import LogEntry from "@/models/LogEntry";
 
 function getErrorMessage(error: unknown) {
@@ -67,6 +71,8 @@ export async function PATCH(
     log.date = deriveLogDate(parsedLoggedAt, timezone);
 
     await log.save();
+    scheduleCoachEmbeddingRefreshForLog(String(log._id));
+    scheduleCoachEmbeddingBackfill(userId);
 
     return NextResponse.json(log);
   } catch (error: unknown) {

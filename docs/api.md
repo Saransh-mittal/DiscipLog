@@ -9,6 +9,16 @@
   - `icon`: String mapping to a pre-defined subset of `lucide-react` icons.
   - `dailyTargetHours`: Daily tracking target for UI components.
   - `weeklyMinTarget` / `weeklyMaxTarget`: Weekly boundaries for UI displays.
+  - `isSideCategory`: Optional boolean for secondary tracking categories.
+- `aiProfile`: Embedded subdocument (`StoredAIProfile`) containing:
+  - `persona`: One of `drill_sergeant`, `mentor`, `analyst`, `hype_man`.
+  - `coreWhy`: User's personal motivation statement.
+  - `customInstructions`: User-defined coaching instructions.
+  - `implicitMemory`: AI-inferred behavioral patterns (≤500 chars).
+  - `implicitMemoryUpdatedAt`, `implicitMemoryLastEvaluatedLogAt`, `implicitMemoryLastEvaluatedChatAt`: Timestamps for memory cooldown logic.
+  - `implicitMemoryPending`: Boolean lock flag for optimistic concurrency control.
+- `usagePattern`: Embedded subdocument for nudge timing. Contains `avgLogHour`, `dayOfWeekAvgHour` (7-element array), `sampleSize`, `lastCalculatedAt`, `inferredTimezone`.
+- `createdAt`: ISO timestamp.
 
 ### Commitment
 - Tracks accountability objects for the "Weekly Commitments" feature.
@@ -27,6 +37,11 @@
 - `category`: User-defined string (must match an existing item in the user's `categories` array).
 - `rawTranscript`: Stored exact web-speech logged content.
 - `aiSummary`: Post-processed analysis text ready for display.
+- `coachEmbedding`: Optional `number[]` vector embedding for Smart Recall semantic search.
+- `embeddingModel`: Optional string identifying the embedding model used (e.g. `text-embedding-3-small`).
+- `embeddingDimensions`: Optional integer for vector dimensionality.
+- `embeddingUpdatedAt`: Optional timestamp for when the embedding was last generated.
+- `coachEmbeddingVersion`: Optional version number for embedding schema migrations.
 - `source`: `"manual"` or `"sprint"` so the dashboard can distinguish timer-created sessions from direct logs.
 - `plannedMinutes`: Optional timer target duration for sprint-created logs.
 - `actualMinutes`: Optional realized timer duration for sprint-created logs.
@@ -35,7 +50,51 @@
 - `loggedAt`: ISO timestamp used for timezone-aware day bucketing and chronological sorting.
 - `createdAt`: ISO timestamp of exact persistence time.
 
-*Indexing Note:* A compound index `userId` + `date` + `category` will be present to accelerate Calendar view fetching speed.
+*Indexing:* `userId + date + category` (compound for calendar view), `userId + embeddingUpdatedAt` (for embedding background jobs).
+
+### Nudge
+- Tracks proactive system-generated nudge notifications.
+- `userId`: Associates the nudge to a specific user.
+- `dateKey`: `YYYY-MM-DD` string for the nudge day.
+- `type`: One of `"friction_break"`, `"daily_reminder"`.
+- `tier`: One of `"warmup"`, `"core"`, `"last_call"`, `"early_spark"`, `"evening_check"`.
+- `message`: LLM-generated, persona-matched nudge text.
+- `ctaLabel`: Button label (default: "Start Quick Timer").
+- `ctaUrl`: Deep link URL (default: "/dashboard").
+- `deliveredViaPush`: Boolean tracking if Web Push was dispatched.
+- `dismissedAt`: Timestamp when user acknowledged the nudge (null if unread).
+- `createdAt`: ISO timestamp.
+
+*Indexing:* `userId + dateKey + tier` (unique — prevents duplicate nudges for the same tier on the same day).
+
+### WeeklyDebrief
+- Stores cinematic weekly performance reviews.
+- `userId`: Associates the debrief to a specific user.
+- `weekStartDate` / `weekEndDate`: `YYYY-MM-DD` boundaries.
+- **Raw metrics:** `totalHours`, `totalLogs`, `bestDay` (date + hours), `consistencyPercent`, `streakDays`.
+- `categoryBreakdown`: Array of per-category objects (`name`, `hours`, `logCount`, `targetHit`, `prevWeekHours`).
+- **AI-generated content:** `weekTitle`, `coachNote`, `mvpCategory`, `hardestDay`, `challengeForNextWeek`.
+- `acknowledgedAt`: Display state — null until user dismisses the modal.
+- `createdAt`: ISO timestamp.
+
+*Indexing:* `userId + weekStartDate` (unique — one debrief per user per week).
+
+### PushSubscription
+- Tracks per-device Web Push subscription endpoints.
+- `userId`: Associates the subscription to a user.
+- `endpoint`: Unique browser push service URL.
+- `keys`: Object with `p256dh` and `auth` encryption keys.
+- `userAgent`: Browser user-agent string.
+- `createdAt`, `lastUsedAt`: Timestamps for lifecycle tracking.
+- `failCount`: Counter for failed delivery attempts (used for cleanup).
+
+*Indexing:* `endpoint` (unique), `userId + endpoint` (compound).
+
+### ErrorLog
+- Stores runtime error reports from both server API routes and the client `GlobalErrorBoundaryV2`.
+- Contains stack traces, user context, and optional user-submitted descriptions.
+
+---
 
 ## Application Endpoints
 
@@ -52,6 +111,7 @@ Supports two payload shapes:
 - Sprint logs are normalized into standard `LogEntry` rows so the same dashboard, history, heatmap, and AI assistant can read them without a parallel session model.
 - For sprint logs, `hours` is derived server-side from `actualMinutes / 60`.
 - The server derives `date` from the effective log instant plus the submitted timezone.
+- **Background side-effects:** After save, fires `scheduleImplicitMemoryRefreshFromLog()`, `scheduleUsagePatternRecalc()`, and `scheduleEmbeddingUpdate()`.
 
 ### `GET /api/logs`
 - Returns the logged-in user's completed `LogEntry` objects for the dashboard, sprint history, calendar, and AI context.
@@ -62,6 +122,7 @@ Supports two payload shapes:
 - Updates an existing user-owned log entry.
 - Used by the V2 log editor modal to change sprint duration, transcript, summary text, and event timestamp.
 - Recomputes the persisted `date` bucket from `loggedAt` + `timezone` so "Today", "This Week", heatmap cells, and progress widgets move with the edit.
+- Re-triggers embedding update after edit.
 
 ### `DELETE /api/logs/[id]`
 - Permanently deletes a user-owned log entry.
@@ -96,4 +157,58 @@ Supports two payload shapes:
 **Body:** `{ messages, logs, timezone }`
 - Productivity coach endpoint. Feeds the user's weekly targets, active commitments, aggregate stats, and raw transcripts into OpenAI to provide personalized, context-aware advice. Formats event timestamps using `loggedAt ?? createdAt` relative to the user's provided `timezone`.
 - Dynamically gathers the contextual targets directly from the DB (`user.categories`) rather than relying on hardcoded system prompts.
+- **Tool-calling:** Registers `searchHistoricalLogs` and `getCoachStats` tools with Zod schemas. The model decides at runtime whether to invoke them (`toolChoice: "auto"`, bounded by `stepCountIs(4)`).
+- Streams responses via `toUIMessageStreamResponse()` with `smoothStream()` pacing.
+- **After stream:** Fires `scheduleImplicitMemoryRefreshFromChat()` non-blocking via `queueMicrotask`.
 - Requires `OPENAI_API_KEY` on the server.
+
+### `POST /api/recall`
+**Body:** `{ query }`
+- Smart Recall endpoint. Performs semantic search across all user logs using vector embeddings.
+- Falls back through Atlas vector search → app-side cosine similarity → keyword/category matching.
+- Returns ranked, relevant historical log entries for display in the Smart Recall feed.
+
+### `POST /api/errors`
+**Body:** `{ message, stack?, userContext? }`
+- Error reporting endpoint used by `GlobalErrorBoundaryV2`.
+- Persists error details to the `ErrorLog` collection in MongoDB.
+
+### `GET /api/nudges` & `PATCH /api/nudges/[id]/dismiss`
+- `GET`: Returns active (un-dismissed) nudges for the current user.
+- `PATCH /api/nudges/[id]/dismiss`: Sets `dismissedAt` on a specific nudge, removing it from the UI.
+
+### `GET /api/debriefs/latest`
+- Returns the most recent un-acknowledged `WeeklyDebrief` for the current user.
+- Powers the cinematic debrief modal on dashboard load.
+
+### `PATCH /api/debriefs/[id]/acknowledge`
+- Sets `acknowledgedAt` on a specific debrief, dismissing the modal.
+
+### `GET /api/debriefs/history`
+- Returns all past weekly debriefs for the current user, ordered chronologically.
+- Powers the Debrief Archive tab.
+
+### `POST /api/cron/daily-nudge`
+- **Secured by `CRON_SECRET` Bearer token.**
+- Runs hourly via external cron. Identifies users who need nudges based on timezone and usage patterns.
+- Computes the appropriate tier (`warmup`, `core`, `last_call` for established users; `early_spark`, `evening_check` for new users).
+- Generates LLM-powered, persona-matched nudge messages and saves them to the `Nudge` collection.
+- Dispatches Web Push notifications to all of the user's registered devices.
+
+### `POST /api/cron/weekly-debrief`
+- **Secured by `CRON_SECRET` Bearer token.**
+- Runs on Sundays via external cron. Gathers all logs for the Mon-Sun week.
+- Computes metrics: total hours, best day, consistency %, category breakdowns, trend arrows vs. previous week.
+- Sends raw JSON data to LLM for narrative generation (dramatic title, coach note, MVP category, hardest day, micro-challenge).
+- Saves the complete debrief to the `WeeklyDebrief` collection.
+- Dispatches a Web Push notification.
+
+### `POST /api/push/subscribe` & `POST /api/push/unsubscribe`
+- `subscribe`: Registers a new Web Push subscription endpoint for the current user (including encryption keys and user-agent).
+- `unsubscribe`: Removes a push subscription from the database.
+
+### `GET /api/end-of-day-review`
+- Returns contextual data for the end-of-day micro-review component.
+
+### `GET /api/users/profile`
+- Returns the authenticated user's profile data including categories, AI profile, and usage patterns.

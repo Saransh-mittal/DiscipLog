@@ -109,6 +109,104 @@ export function formatLocalDate(date: Date): string {
   return `${year}-${month}-${day}`;
 }
 
+export interface ZonedDateContext {
+  year: string;
+  month: string;
+  day: string;
+  hour: string;
+  minute: string;
+  second: string;
+  weekday: string;
+  dateKey: string;
+  timeKey: string;
+}
+
+const WEEKDAY_TO_INDEX: Record<string, number> = {
+  Sunday: 0,
+  Monday: 1,
+  Tuesday: 2,
+  Wednesday: 3,
+  Thursday: 4,
+  Friday: 5,
+  Saturday: 6,
+};
+
+function getUtcDateKey(date: Date): string {
+  return `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, "0")}-${String(date.getUTCDate()).padStart(2, "0")}`;
+}
+
+export function getZonedDateContext(
+  date: Date,
+  timezone: string
+): ZonedDateContext {
+  const formatter = new Intl.DateTimeFormat("en-US", {
+    timeZone: timezone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hourCycle: "h23",
+    weekday: "long",
+  });
+  const parts = formatter.formatToParts(date);
+
+  const year = parts.find((part) => part.type === "year")?.value;
+  const month = parts.find((part) => part.type === "month")?.value;
+  const day = parts.find((part) => part.type === "day")?.value;
+  const hour = parts.find((part) => part.type === "hour")?.value;
+  const minute = parts.find((part) => part.type === "minute")?.value;
+  const second = parts.find((part) => part.type === "second")?.value;
+  const weekday = parts.find((part) => part.type === "weekday")?.value;
+
+  if (!year || !month || !day || !hour || !minute || !second || !weekday) {
+    throw new Error("Unable to derive timezone-aware date context");
+  }
+
+  return {
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    weekday,
+    dateKey: `${year}-${month}-${day}`,
+    timeKey: `${hour}:${minute}`,
+  };
+}
+
+export function getDateKeyInTimezone(
+  timezone: string,
+  date: Date = new Date()
+): string {
+  return getZonedDateContext(date, timezone).dateKey;
+}
+
+export function getWeekStartDateKey(
+  timezone: string,
+  date: Date = new Date()
+): string {
+  const zoned = getZonedDateContext(date, timezone);
+  const weekdayIndex = WEEKDAY_TO_INDEX[zoned.weekday];
+
+  if (weekdayIndex === undefined) {
+    throw new Error("Unable to derive weekday index for timezone");
+  }
+
+  const daysFromMonday = weekdayIndex === 0 ? 6 : weekdayIndex - 1;
+  const mondayUtc = new Date(
+    Date.UTC(
+      Number(zoned.year),
+      Number(zoned.month) - 1,
+      Number(zoned.day) - daysFromMonday
+    )
+  );
+
+  return getUtcDateKey(mondayUtc);
+}
+
 export function getLogTimestampValue(log: {
   loggedAt?: string | Date | null;
   createdAt?: string | Date | null;

@@ -57,7 +57,7 @@ export async function PUT(req: Request) {
     const user = await User.findByIdAndUpdate(
       userId,
       { categories },
-      { new: true, runValidators: true }
+      { returnDocument: "after", runValidators: true }
     );
 
     if (!user) {

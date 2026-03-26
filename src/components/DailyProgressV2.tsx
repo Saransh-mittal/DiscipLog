@@ -1,74 +1,61 @@
 "use client";
 
-import { useMemo } from "react";
-import { Card } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { useCategoriesContext } from "@/components/CategoriesProvider";
 import DynamicIcon from "@/components/DynamicIcon";
-import { DashboardLog, formatLocalDate } from "@/lib/logs";
+import { useMomentum } from "@/components/MomentumProvider";
+import { useWorld } from "@/components/worlds/WorldRenderer";
 
-interface DailyProgressV2Props {
-  logs: DashboardLog[];
-  loading: boolean;
-}
+export default function DailyProgressV2() {
+  const { categories: rawCategories, loading: catLoading } = useCategoriesContext();
+  const categories = rawCategories || [];
+  const {
+    todayByCategory,
+    todayHours,
+    dailyEnergy,
+    streakPower,
+    loading: momentumLoading,
+    microInteractions,
+  } = useMomentum();
+  const { CardSkin, theme } = useWorld();
+  const isLoading = catLoading || momentumLoading;
 
-export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props) {
-  const { categories, loading: catLoading } = useCategoriesContext();
-  const today = useMemo(() => formatLocalDate(new Date()), []);
+  const { completionPulse, progressShimmer } = microInteractions;
 
-  const todayByCategory = useMemo(() => {
-    const result: Record<string, number> = {};
-    logs.forEach((log) => {
-      if (log.date === today) {
-        result[log.category] = (result[log.category] || 0) + log.hours;
-      }
-    });
-    return result;
-  }, [logs, today]);
-
-  const totalToday = Object.values(todayByCategory).reduce((s, h) => s + h, 0);
-  const isLoading = loading || catLoading;
+  const barGlow = dailyEnergy >= 4
+    ? `0 0 12px ${theme.accentGlow}`
+    : "none";
 
   return (
-    <Card
-      className="relative overflow-hidden p-0 border"
-      style={{
-        background: "var(--v2-surface)",
-        borderColor: "var(--v2-border)",
-      }}
-    >
-      <div
-        className="h-[2px] w-full"
-        style={{
-          background:
-            "linear-gradient(90deg, var(--v2-amber-500), var(--v2-amber-300), var(--v2-amber-500))",
-        }}
-      />
+    <CardSkin className="relative overflow-hidden" style={{ padding: 0 }}>
+      {/* Accent line */}
+      <div style={{ height: 2, background: `linear-gradient(90deg, transparent, ${theme.accent}, transparent)`, opacity: 0.5 }} />
 
       <div className="p-6 md:p-8">
         <div className="flex items-center justify-between mb-5">
           <h3
             className="text-lg font-bold tracking-tight"
-            style={{ fontFamily: "var(--font-display)" }}
+            style={{
+              fontFamily: "var(--font-display)",
+              color: theme.textPrimary,
+              transition: "color 800ms ease",
+            }}
           >
             Today&apos;s Breakdown
           </h3>
           <div className="flex items-center gap-2">
             <span
-              className="text-2xl font-bold tracking-tight"
+              className="text-2xl font-bold tracking-tight transition-colors duration-500"
               style={{
                 fontFamily: "var(--font-display)",
-                color: totalToday > 0 ? "var(--v2-amber-300)" : "var(--v2-text-muted)",
+                color: todayHours > 0 ? theme.accent : theme.textMuted,
               }}
             >
-              {isLoading ? "—" : `${totalToday}h`}
+              {isLoading ? "—" : `${todayHours.toFixed(2)}h`}
             </span>
             <span
               className="text-[10px] font-semibold uppercase tracking-[0.15em]"
-              style={{
-                color: "var(--v2-text-muted)",
-                fontFamily: "var(--font-body)",
-              }}
+              style={{ color: theme.textMuted, fontFamily: "var(--font-body)" }}
             >
               logged
             </span>
@@ -77,48 +64,40 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
 
         <div
           className="grid gap-3"
-          style={{
-            gridTemplateColumns: `repeat(${Math.min(categories.length, 4)}, minmax(0, 1fr))`,
-          }}
+          style={{ gridTemplateColumns: `repeat(${Math.min(categories.length, 4)}, minmax(0, 1fr))` }}
         >
           {categories.map((cat) => {
             const logged = todayByCategory[cat.name] || 0;
             const hasTarget = cat.dailyTargetHours > 0;
             const percentage = hasTarget
               ? Math.min((logged / cat.dailyTargetHours) * 100, 100)
-              : logged > 0
-                ? 100
-                : 0;
+              : logged > 0 ? 100 : 0;
             const isDone = hasTarget ? logged >= cat.dailyTargetHours : logged > 0;
 
             return (
               <div
                 key={cat.name}
-                className="rounded-xl p-4 border transition-colors duration-200"
+                className={`rounded-xl p-4 border transition-all duration-500 ${
+                  isDone && completionPulse ? "completion-pulse" : ""
+                }`}
                 style={{
-                  background: "var(--v2-surface-raised)",
-                  borderColor: isDone
-                    ? "oklch(0.65 0.19 60 / 20%)"
-                    : "var(--v2-border)",
+                  background: theme.surfaceRaised,
+                  borderColor: theme.border,
+                  borderRadius: theme.borderRadius,
                 }}
               >
                 {/* Icon + label */}
                 <div className="flex items-center gap-2 mb-3">
                   <DynamicIcon
-                    name={cat.icon}
-                    className="w-4 h-4"
+                    name={cat.icon || "CircleDashed"}
+                    className="w-4 h-4 transition-colors duration-500"
                     style={{
-                      color: isDone
-                        ? "var(--v2-amber-400)"
-                        : "var(--v2-obsidian-300)",
+                      color: isDone ? theme.accent : theme.textMuted,
                     }}
                   />
                   <span
                     className="text-[11px] font-semibold truncate"
-                    style={{
-                      color: "var(--v2-text-secondary)",
-                      fontFamily: "var(--font-body)",
-                    }}
+                    style={{ color: theme.textSecondary, fontFamily: "var(--font-body)" }}
                   >
                     {cat.name}
                   </span>
@@ -127,47 +106,40 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
                 {/* Hours */}
                 <div className="flex items-baseline gap-1 mb-2.5">
                   <span
-                    className="text-xl font-bold tabular-nums"
+                    className="text-xl font-bold tabular-nums transition-colors duration-500"
                     style={{
                       fontFamily: "var(--font-display)",
-                      color: isDone ? "var(--v2-amber-300)" : "var(--v2-text-primary)",
+                      color: isDone ? theme.accent : theme.textPrimary,
                     }}
                   >
-                    {isLoading ? "—" : logged}
+                    {isLoading ? "—" : logged.toFixed(2)}
                   </span>
                   {hasTarget && (
-                    <span
-                      className="text-xs font-medium"
-                      style={{ color: "var(--v2-text-muted)" }}
-                    >
+                    <span className="text-xs font-medium" style={{ color: theme.textMuted }}>
                       / {cat.dailyTargetHours}h
                     </span>
                   )}
                   {!hasTarget && logged > 0 && (
-                    <span
-                      className="text-xs font-medium"
-                      style={{ color: "var(--v2-sage-400)" }}
-                    >
+                    <span className="text-xs font-medium" style={{ color: theme.textMuted }}>
                       h ✓
                     </span>
                   )}
                 </div>
 
-                {/* Mini progress bar */}
+                {/* Progress bar */}
                 <div
-                  className="w-full h-1.5 rounded-full overflow-hidden"
-                  style={{ background: "var(--v2-surface-overlay)" }}
+                  className={`w-full h-1.5 rounded-full overflow-hidden ${
+                    !isDone && progressShimmer ? "progress-shimmer" : ""
+                  }`}
+                  style={{ background: theme.surfaceRaised }}
                 >
                   <div
                     className="h-full rounded-full"
                     style={{
                       width: isLoading ? "0%" : `${percentage}%`,
-                      background: !hasTarget && logged > 0
-                        ? "var(--v2-sage-400)"
-                        : isDone
-                          ? "var(--v2-amber-400)"
-                          : "linear-gradient(90deg, var(--v2-amber-600), var(--v2-amber-400))",
-                      transition: "width 0.8s cubic-bezier(0.22, 1, 0.36, 1)",
+                      background: `linear-gradient(90deg, ${theme.accent}, ${theme.accent})`,
+                      transition: "width 0.8s cubic-bezier(0.22, 1, 0.36, 1), background 800ms ease",
+                      boxShadow: isDone ? barGlow : "none",
                     }}
                   />
                 </div>
@@ -178,16 +150,11 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
                     variant="outline"
                     className="mt-2 text-[9px] px-1.5 py-0 border"
                     style={{
-                      borderColor: !hasTarget
-                        ? "oklch(0.62 0.14 155 / 25%)"
-                        : "oklch(0.65 0.19 60 / 25%)",
-                      color: !hasTarget
-                        ? "var(--v2-sage-400)"
-                        : "var(--v2-amber-400)",
-                      background: !hasTarget
-                        ? "oklch(0.62 0.14 155 / 5%)"
-                        : "oklch(0.65 0.19 60 / 5%)",
+                      borderColor: `${theme.accent}40`,
+                      color: theme.accent,
+                      background: `${theme.accent}0D`,
                       fontFamily: "var(--font-body)",
+                      animation: streakPower >= 3 ? "badge-celebrate 2s ease-in-out infinite" : "none",
                     }}
                   >
                     Done!
@@ -199,8 +166,8 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
                     className="mt-2 text-[9px] px-1.5 py-0 border"
                     style={{
                       borderColor: "transparent",
-                      color: "var(--v2-text-muted)",
-                      background: "var(--v2-surface-overlay)",
+                      color: theme.textMuted,
+                      background: theme.surfaceRaised,
                       fontFamily: "var(--font-body)",
                     }}
                   >
@@ -212,6 +179,6 @@ export default function DailyProgressV2({ logs, loading }: DailyProgressV2Props)
           })}
         </div>
       </div>
-    </Card>
+    </CardSkin>
   );
 }

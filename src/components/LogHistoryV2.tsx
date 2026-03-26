@@ -12,7 +12,7 @@ import {
   TimerReset,
   Trash2,
 } from "lucide-react";
-import { Card } from "@/components/ui/card";
+import WorldCard from "@/components/WorldCard";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,31 +42,40 @@ interface LogHistoryV2Props {
 function renderMarkdown(text: string) {
   if (!text) return "";
 
+  // Bold text
   let html = text.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
-  html = html.replace(/(?:^|\s+)([\*\-])\s+/g, "\n$1 ");
 
+  // Split into lines while preserving structure
   const lines = html.split("\n").filter((line) => line.trim().length > 0);
   let inList = false;
   let finalHtml = "";
 
   for (const line of lines) {
     const trimmed = line.trim();
+    // Check if line is a list item (starts with * or -)
     if (trimmed.startsWith("* ") || trimmed.startsWith("- ")) {
       if (!inList) {
         finalHtml +=
-          '<ul class="list-disc pl-4 space-y-1.5 mt-2 opacity-90" style="color: var(--v2-text-primary);">\n';
+          '<ul class="list-disc pl-4 space-y-2 mt-2 opacity-90" style="color: var(--v2-text-primary);">\n';
         inList = true;
       }
-      finalHtml += `<li>${trimmed.substring(2)}</li>\n`;
+      // Extract content after the bullet, preserving code-like syntax
+      const content = trimmed.substring(2);
+      finalHtml += `<li class="leading-relaxed">${content}</li>\n`;
     } else {
+      // Close list if transitioning to paragraph
       if (inList) {
         finalHtml += "</ul>\n";
         inList = false;
       }
-      finalHtml += `<p class="mb-2 leading-relaxed">${trimmed}</p>\n`;
+      // Only add non-empty paragraphs
+      if (trimmed.length > 0) {
+        finalHtml += `<p class="mb-2 leading-relaxed">${trimmed}</p>\n`;
+      }
     }
   }
 
+  // Close any open list
   if (inList) {
     finalHtml += "</ul>\n";
   }
@@ -127,9 +136,9 @@ function getCategoryColor(category: string) {
   }
 
   return {
-    bg: "oklch(0.65 0.19 60 / 10%)",
-    text: "var(--v2-amber-400)",
-    border: "oklch(0.65 0.19 60 / 25%)",
+    bg: "color-mix(in oklch, var(--world-accent, var(--v2-amber-400)) 12%, transparent)",
+    text: "var(--world-accent, var(--v2-amber-400))",
+    border: "color-mix(in oklch, var(--world-accent, var(--v2-amber-400)) 25%, transparent)",
   };
 }
 
@@ -178,12 +187,9 @@ function LogCard({
 
   return (
     <>
-      <Card
-        className="p-4 border transition-all hover:bg-[var(--v2-obsidian-600)]"
-        style={{
-          background: "var(--v2-surface)",
-          borderColor: "var(--v2-border)",
-        }}
+      <WorldCard
+        className="transition-all hover:bg-[var(--v2-obsidian-600)]"
+        style={{ padding: "1rem" }}
       >
         <div className="flex flex-col gap-4">
           <div className="flex flex-col md:flex-row md:items-start justify-between gap-4">
@@ -203,12 +209,35 @@ function LogCard({
                   <Badge
                     variant="outline"
                     style={{
-                      background: "oklch(0.65 0.19 60 / 6%)",
-                      color: "var(--v2-amber-300)",
-                      borderColor: "oklch(0.65 0.19 60 / 20%)",
+                      background: "color-mix(in oklch, var(--world-accent, var(--v2-amber-400)) 8%, transparent)",
+                      color: "var(--world-accent, var(--v2-amber-300))",
+                      borderColor: "color-mix(in oklch, var(--world-accent, var(--v2-amber-400)) 20%, transparent)",
                     }}
                   >
                     Sprint
+                  </Badge>
+                ) : null}
+                {log.source === "sprint" && log.completionStatus === "finished_early" ? (
+                  <Badge
+                    variant="outline"
+                    className="border-none px-2 py-0 h-5 text-[10px] font-bold uppercase tracking-wider"
+                    style={{
+                      background: "oklch(0.60 0.20 18 / 12%)",
+                      color: "var(--v2-rose-400)",
+                    }}
+                  >
+                    Finished Early
+                  </Badge>
+                ) : log.source === "sprint" && log.completionStatus === "completed" ? (
+                  <Badge
+                    variant="outline"
+                    className="border-none px-2 py-0 h-5 text-[10px] font-bold uppercase tracking-wider"
+                    style={{
+                      background: "oklch(0.62 0.14 155 / 12%)",
+                      color: "var(--v2-sage-400)",
+                    }}
+                  >
+                    Completed
                   </Badge>
                 ) : null}
                 <div
@@ -216,7 +245,7 @@ function LogCard({
                   style={{ color: "var(--v2-text-muted)" }}
                 >
                   <Clock className="w-3.5 h-3.5" />
-                  <span className="font-mono">{log.hours}h</span>
+                  <span className="font-mono">{log.hours.toFixed(2)}h</span>
                 </div>
                 {formatSprintMeta(log) ? (
                   <div
@@ -252,7 +281,7 @@ function LogCard({
                   </div>
                   <p
                     className="text-xs uppercase tracking-[0.18em]"
-                    style={{ color: "var(--v2-amber-400)" }}
+                    style={{ color: "var(--world-accent, var(--v2-amber-400))" }}
                   >
                     Open editor to generate or customize the summary.
                   </p>
@@ -324,7 +353,7 @@ function LogCard({
             </div>
           ) : null}
         </div>
-      </Card>
+      </WorldCard>
 
       <LogEditorDialog
         log={log}
@@ -436,28 +465,33 @@ export default function LogHistoryV2({
 
   if (loading) {
     return (
-      <Card
-        className="p-8 border flex items-center justify-center min-h-[300px]"
-        style={{
-          background: "var(--v2-surface)",
-          borderColor: "var(--v2-border)",
-        }}
+      <WorldCard
+        className="relative overflow-hidden"
+        style={{ padding: 0 }}
       >
-        <p className="text-sm" style={{ color: "var(--v2-text-muted)" }}>
-          Loading history...
-        </p>
-      </Card>
+        <div className="p-6 md:p-8 space-y-4">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className="animate-pulse flex flex-col gap-3 py-4">
+              <div className="flex items-center gap-3">
+                <div className="h-5 w-5 rounded" style={{ background: "var(--v2-surface-raised)" }} />
+                <div className="h-4 rounded" style={{ background: "var(--v2-surface-raised)", width: "120px" }} />
+                <div className="ml-auto h-3 rounded" style={{ background: "var(--v2-surface-raised)", width: "60px" }} />
+              </div>
+              <div className="h-3 rounded" style={{ background: "var(--v2-surface-raised)", width: "80%" }} />
+              <div className="h-3 rounded" style={{ background: "var(--v2-surface-raised)", width: "50%" }} />
+            </div>
+          ))}
+        </div>
+      </WorldCard>
     );
   }
 
   return (
-    <Card
-      className="p-6 md:p-8 border shadow-sm relative overflow-hidden"
-      style={{
-        background: "var(--v2-surface)",
-        borderColor: "var(--v2-border)",
-      }}
+    <WorldCard
+      className="relative overflow-hidden"
+      style={{ padding: 0 }}
     >
+      <div className="p-6 md:p-8">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
         <div>
           <h2
@@ -488,13 +522,13 @@ export default function LogHistoryV2({
               borderColor: "var(--v2-border)",
             }}
           >
-            <TabsTrigger value="all" className="data-[state=active]:bg-[var(--v2-surface)] data-[state=active]:text-[var(--v2-amber-300)]">
+            <TabsTrigger value="all" className="data-[state=active]:bg-[var(--v2-surface)] data-[state=active]:text-[var(--world-accent,var(--v2-amber-300))]">
               All Sessions
             </TabsTrigger>
-            <TabsTrigger value="week" className="data-[state=active]:bg-[var(--v2-surface)] data-[state=active]:text-[var(--v2-amber-300)]">
+            <TabsTrigger value="week" className="data-[state=active]:bg-[var(--v2-surface)] data-[state=active]:text-[var(--world-accent,var(--v2-amber-300))]">
               This Week
             </TabsTrigger>
-            <TabsTrigger value="today" className="data-[state=active]:bg-[var(--v2-surface)] data-[state=active]:text-[var(--v2-amber-300)]">
+            <TabsTrigger value="today" className="data-[state=active]:bg-[var(--v2-surface)] data-[state=active]:text-[var(--world-accent,var(--v2-amber-300))]">
               Today
             </TabsTrigger>
           </TabsList>
@@ -515,6 +549,7 @@ export default function LogHistoryV2({
           ))
         )}
       </div>
-    </Card>
+      </div>
+    </WorldCard>
   );
 }

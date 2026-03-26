@@ -18,9 +18,13 @@ import {
   Square,
 } from "lucide-react";
 import { useSpeechRecognition } from "@/hooks/useSpeechRecognition";
+import type { DashboardLog } from "@/lib/logs";
+import ToolCallAccordion from "@/components/ToolCallAccordion";
+import type { ToolCallData } from "@/components/ToolCallAccordion";
+import ChatMarkdown from "@/components/ChatMarkdown";
 
 interface AIAssistantV2Props {
-  logs: any[];
+  logs: DashboardLog[];
 }
 
 const QUICK_PROMPTS = [
@@ -34,9 +38,76 @@ const QUICK_PROMPTS = [
 function getMessageText(msg: UIMessage): string {
   if (!msg.parts || msg.parts.length === 0) return "";
   return msg.parts
-    .filter((p: any) => p.type === "text")
-    .map((p: any) => p.text ?? "")
+    .filter((part) => part.type === "text")
+    .map((part) => (part.type === "text" ? part.text ?? "" : ""))
     .join("");
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
+}
+
+/** Tool label map */
+const TOOL_LABELS: Record<string, { loading: string; success: string; error: string }> = {
+  searchHistoricalLogs: {
+    loading: "Searching history…",
+    success: "Searched history",
+    error: "History search failed",
+  },
+  getCoachStats: {
+    loading: "Loading stats…",
+    success: "Stats loaded",
+    error: "Stats failed",
+  },
+};
+
+/** Extract rich tool call data from a UIMessage */
+function getToolCallDataFromMessage(msg: UIMessage): ToolCallData[] {
+  if (!msg.parts || msg.parts.length === 0) return [];
+
+  return msg.parts.flatMap((part, index): ToolCallData[] => {
+    if (!isRecord(part) || typeof (part as Record<string, unknown>).type !== "string") return [];
+    const rec = part as Record<string, unknown>;
+    const partType = rec.type as string;
+    if (!partType.startsWith("tool-")) return [];
+    const state = rec.state as string | undefined;
+    if (!state) return [];
+
+    const toolName = partType.replace(/^tool-/, "");
+    const labels = TOOL_LABELS[toolName];
+    if (!labels) return [];
+
+    const key = typeof rec.toolCallId === "string"
+      ? `${partType}-${rec.toolCallId}`
+      : `${partType}-${index}`;
+
+    let status: "loading" | "success" | "error";
+    switch (state) {
+      case "input-streaming":
+      case "input-available":
+        status = "loading";
+        break;
+      case "output-available":
+        status = "success";
+        break;
+      case "output-error":
+      case "input-error":
+      case "output-denied":
+        status = "error";
+        break;
+      default:
+        return [];
+    }
+
+    return [{
+      key,
+      toolName,
+      label: labels[status],
+      status,
+      input: isRecord(rec.input) ? (rec.input as Record<string, unknown>) : undefined,
+      output: isRecord(rec.output) ? (rec.output as Record<string, unknown>) : undefined,
+    }];
+  });
 }
 
 /* ─────────────── Injected Styles ─────────────── */
@@ -73,6 +144,18 @@ const CHAT_STYLES = `
   @keyframes dcl-shimmer {
     0% { background-position: -200% 0; }
     100% { background-position: 200% 0; }
+  }
+  @keyframes dcl-step-glow-anim {
+    0% { box-shadow: 0 0 0 oklch(0.65 0.19 60 / 0%); }
+    40% { box-shadow: 0 0 12px oklch(0.72 0.16 145 / 30%), 0 0 4px oklch(0.72 0.16 145 / 15%); }
+    100% { box-shadow: 0 0 0 oklch(0.65 0.19 60 / 0%); }
+  }
+  .dcl-step-glow {
+    animation: dcl-step-glow-anim 0.8s ease-out;
+  }
+
+  .dcl-md-root p:last-child {
+    margin-bottom: 0;
   }
 
   .dcl-panel {
@@ -207,7 +290,7 @@ const CHAT_STYLES = `
 
 export default function AIAssistantV2({ logs }: AIAssistantV2Props) {
   const [isOpen, setIsOpen] = useState(false);
-  const [hasGreeted, setHasGreeted] = useState(false);
+  const hasGreetedRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const rafRef = useRef<number | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
@@ -257,29 +340,45 @@ export default function AIAssistantV2({ logs }: AIAssistantV2Props) {
   const isBusy = isStreaming || isSubmitted;
 
   /* ── Scroll helpers ── */
-  const scrollToBottom = useCallback(() => {
+  const scrollToBottom = useCallback((force = false) => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
+      const el = scrollRef.current;
+      if (force || el.scrollHeight - el.scrollTop - el.clientHeight < 150) {
+        el.scrollTop = el.scrollHeight;
+      }
     }
   }, []);
 
   useEffect(() => {
-    scrollToBottom();
+    scrollToBottom(true);
   }, [messages.length, scrollToBottom]);
 
-  // RAF-based continuous scroll while streaming
+  // Smart continuous scroll while streaming
   useEffect(() => {
-    if (isStreaming) {
-      const tick = () => {
-        scrollToBottom();
-        rafRef.current = requestAnimationFrame(tick);
-      };
-      rafRef.current = requestAnimationFrame(tick);
-      return () => {
-        if (rafRef.current) cancelAnimationFrame(rafRef.current);
-      };
-    }
-  }, [isStreaming, scrollToBottom]);
+    const el = scrollRef.current;
+    if (!el || !isStreaming) return;
+
+    let isUserScrolledUp = el.scrollHeight - el.scrollTop - el.clientHeight > 150;
+    
+    const handleScroll = () => {
+      isUserScrolledUp = el.scrollHeight - el.scrollTop - el.clientHeight > 150;
+    };
+    
+    el.addEventListener("scroll", handleScroll, { passive: true });
+
+    const observer = new MutationObserver(() => {
+      if (!isUserScrolledUp) {
+        el.scrollTop = el.scrollHeight;
+      }
+    });
+    
+    observer.observe(el, { childList: true, subtree: true, characterData: true });
+
+    return () => {
+      el.removeEventListener("scroll", handleScroll);
+      observer.disconnect();
+    };
+  }, [isStreaming]);
 
   /* ── Auto-focus input when panel opens ── */
   useEffect(() => {
@@ -288,31 +387,30 @@ export default function AIAssistantV2({ logs }: AIAssistantV2Props) {
     }
   }, [isOpen]);
 
-  // Helper to send messages with the exact current logs in the request body
+  // The server now retrieves canonical coach context directly from MongoDB.
   const sendWithContext = useCallback(
     (text: string) => {
       sendMessage(
         { text },
         {
           body: {
-            logs,
             timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
           },
         }
       );
     },
-    [sendMessage, logs]
+    [sendMessage]
   );
 
   /* ── Initial greeting ── */
   useEffect(() => {
-    if (isOpen && !hasGreeted && messages.length === 0 && logs.length > 0) {
-      setHasGreeted(true);
+    if (isOpen && !hasGreetedRef.current && messages.length === 0 && logs.length > 0) {
+      hasGreetedRef.current = true;
       sendWithContext(
         "Give me a quick daily insight on my productivity today and this week. Be direct and brief."
       );
     }
-  }, [isOpen, hasGreeted, logs, messages.length, sendWithContext]);
+  }, [isOpen, logs, messages.length, sendWithContext]);
 
   /* ── Handlers ── */
   const handleSubmit = (e: React.FormEvent) => {
@@ -340,6 +438,8 @@ export default function AIAssistantV2({ logs }: AIAssistantV2Props) {
   const lastMsg = messages[messages.length - 1];
   const lastAssistantIsStreaming =
     isStreaming && lastMsg?.role === "assistant";
+  const lastAssistantText = lastMsg ? getMessageText(lastMsg) : "";
+  const lastAssistantToolData = lastMsg ? getToolCallDataFromMessage(lastMsg) : [];
 
   return (
     <>
@@ -515,12 +615,14 @@ export default function AIAssistantV2({ logs }: AIAssistantV2Props) {
             {/* Messages */}
             {messages.map((msg: UIMessage, i: number) => {
               const text = getMessageText(msg);
+              const toolData = getToolCallDataFromMessage(msg);
               const isLastStreaming =
                 lastAssistantIsStreaming && i === messages.length - 1;
               const isAssistant = msg.role === "assistant";
+              const hasVisibleContent = Boolean(text) || toolData.length > 0;
 
               // If it's reasoning and hasn't produced text yet, hide the empty bubble
-              if (isAssistant && isLastStreaming && !text) {
+              if (isAssistant && isLastStreaming && !hasVisibleContent) {
                 return null;
               }
 
@@ -553,7 +655,7 @@ export default function AIAssistantV2({ logs }: AIAssistantV2Props) {
                   <div
                     className={`max-w-[82%] px-3.5 py-2.5 rounded-2xl text-[13px] leading-[1.65] ${
                       isAssistant ? "dcl-assistant-bubble" : "dcl-user-bubble"
-                    } ${isLastStreaming ? "dcl-cursor" : ""}`}
+                    }`}
                     style={{
                       border: `1px solid ${
                         isAssistant
@@ -564,14 +666,43 @@ export default function AIAssistantV2({ logs }: AIAssistantV2Props) {
                         ? "oklch(0.85 0.01 250)"
                         : "oklch(0.9 0.03 80)",
                       fontFamily: "var(--font-body)",
-                      whiteSpace: "pre-wrap",
                       wordBreak: "break-word",
                       borderRadius: isAssistant
                         ? "4px 18px 18px 18px"
                         : "18px 4px 18px 18px",
                     }}
                   >
-                    {text || (isLastStreaming ? "" : "…")}
+                    {toolData.length > 0 && (
+                      <ToolCallAccordion steps={toolData} />
+                    )}
+                    {isAssistant && text ? (
+                      <ChatMarkdown content={text} isStreaming={isLastStreaming} />
+                    ) : isAssistant && isLastStreaming && toolData.every((t) => t.status !== "loading") ? (
+                      <div className="flex items-center gap-3 py-1">
+                        <div className="flex gap-1">
+                          {[0, 1, 2].map((n) => (
+                            <div
+                              key={n}
+                              className="dcl-dot w-1.5 h-1.5 rounded-full"
+                              style={{ background: "var(--v2-amber-400)" }}
+                            />
+                          ))}
+                        </div>
+                        <span
+                          className="text-[11px]"
+                          style={{
+                            color: "oklch(0.5 0.01 250)",
+                            fontFamily: "var(--font-body)",
+                          }}
+                        >
+                          Analyzing your data…
+                        </span>
+                      </div>
+                    ) : (
+                      <span style={{ whiteSpace: "pre-wrap" }}>
+                        {text || (isLastStreaming || toolData.length > 0 ? "" : "…")}
+                      </span>
+                    )}
                   </div>
 
                   {/* User avatar */}
@@ -595,7 +726,9 @@ export default function AIAssistantV2({ logs }: AIAssistantV2Props) {
 
             {/* Thinking indicator — shown during 'submitted' or reasoning phase */}
             {(isSubmitted ||
-              (lastAssistantIsStreaming && !getMessageText(lastMsg))) && (
+              (lastAssistantIsStreaming &&
+                !lastAssistantText &&
+                lastAssistantToolData.length === 0)) && (
               <div className="dcl-msg flex items-start gap-2.5 justify-start">
                 <div
                   className="shrink-0 mt-1 p-1.5 rounded-lg"
