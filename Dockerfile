@@ -5,12 +5,10 @@ FROM base AS deps
 # Debian uses glibc, so libc6-compat is not needed.
 WORKDIR /app
 
-# Install dependencies based on the preferred package manager
-COPY package.json package-lock.json* ./
-# Use npm install instead of npm ci so NPM fetches the current OS's optional dependencies
+# Install dependencies based on package.json (omitting package-lock.json to avoid macOS vs Linux OS optional bindings pruning)
+COPY package.json ./
 RUN npm install
-# Explicitly force-install the native bindings that NPM might omit from the lockfile transitive tree
-RUN npm install --no-save lightningcss-linux-x64-gnu
+
 
 # Rebuild the source code only when needed
 FROM base AS builder
