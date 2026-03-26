@@ -7,7 +7,8 @@ WORKDIR /app
 
 # Install dependencies based on the preferred package manager
 COPY package.json package-lock.json* ./
-RUN npm ci
+# Use npm install instead of npm ci so NPM fetches the current OS's optional dependencies
+RUN npm install
 
 # Rebuild the source code only when needed
 FROM base AS builder
