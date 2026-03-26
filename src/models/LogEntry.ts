@@ -13,6 +13,7 @@ export interface ILogEntry extends Document {
   category: string;
   rawTranscript: string;
   aiSummary?: string;
+  tags?: string[];
   coachEmbedding?: number[];
   embeddingModel?: string;
   embeddingDimensions?: number;
@@ -35,6 +36,7 @@ const LogEntrySchema: Schema = new Schema({
   category: { type: String, required: true },
   rawTranscript: { type: String, required: true },
   aiSummary: { type: String },
+  tags: { type: [String], default: [] },
   coachEmbedding: { type: [Number], default: undefined },
   embeddingModel: { type: String },
   embeddingDimensions: { type: Number },

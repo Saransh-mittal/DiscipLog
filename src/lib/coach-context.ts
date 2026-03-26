@@ -18,6 +18,7 @@ import connectToDatabase from "@/lib/mongoose";
 import Commitment from "@/models/Commitment";
 import LogEntry from "@/models/LogEntry";
 import User from "@/models/User";
+import WeeklyDebrief, { type IWeeklyDebrief } from "@/models/WeeklyDebrief";
 
 const MAX_RECENT_LOGS = 8;
 const MAX_HISTORICAL_MATCHES = 8;
@@ -404,6 +405,7 @@ export interface BaselineCoachContext {
   userCategories: UserCategory[];
   todayDateKey: string;
   weekStartDateKey: string;
+  latestWeeklyDebrief?: IWeeklyDebrief | null;
 }
 
 export type HistoricalRetrievalMode = "none" | "vector" | "cosine" | "keyword";
@@ -1222,7 +1224,7 @@ export async function getBaselineCoachContext(input: {
 
   const todayDateKey = getDateKeyInTimezone(input.timezone);
   const weekStartDateKey = getWeekStartDateKey(input.timezone);
-  const [{ userCategories, aiProfile }, recentLogsRaw, structuredStats, commitments] =
+  const [{ userCategories, aiProfile }, recentLogsRaw, structuredStats, commitments, latestDebriefs] =
     await Promise.all([
       loadUserCoachConfig(input.userId),
       LogEntry.find({ userId: input.userId })
@@ -1239,6 +1241,10 @@ export async function getBaselineCoachContext(input: {
         userId: input.userId,
         weekStart: weekStartDateKey,
       }).lean<CommitmentSummary[]>(),
+      WeeklyDebrief.find({ userId: input.userId })
+        .sort({ createdAt: -1 })
+        .limit(1)
+        .lean<IWeeklyDebrief[]>(),
     ]);
 
   return {
@@ -1250,6 +1256,7 @@ export async function getBaselineCoachContext(input: {
     userCategories,
     todayDateKey,
     weekStartDateKey,
+    latestWeeklyDebrief: latestDebriefs[0] ?? null,
   };
 }
 

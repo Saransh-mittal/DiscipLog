@@ -1,4 +1,4 @@
-import { embed } from "ai";
+import { embed, generateText } from "ai";
 import { openai } from "@ai-sdk/openai";
 import type { SearchIndexDescription } from "mongodb";
 import connectToDatabase from "@/lib/mongoose";
@@ -23,6 +23,7 @@ interface EmbeddableLog {
   category?: string;
   aiSummary?: string | null;
   rawTranscript?: string | null;
+  tags?: string[];
 }
 
 const queuedLogRefreshes = new Set<string>();
@@ -59,6 +60,10 @@ export function buildCoachRetrievalText(log: EmbeddableLog): string {
     details.push(`Transcript excerpt: ${transcript}`);
   } else {
     details.push("Summary: No summary available.");
+  }
+
+  if (log.tags && log.tags.length > 0) {
+    details.push(`Tags: ${log.tags.join(", ")}`);
   }
 
   return details.join("\n");
@@ -152,18 +157,47 @@ export async function refreshCoachEmbeddingForLog(logId: string): Promise<void> 
     await connectToDatabase();
 
     const log = await LogEntry.findById(logId)
-      .select("userId date hours category aiSummary rawTranscript")
+      .select("userId date hours category aiSummary rawTranscript tags")
       .lean<EmbeddableLog | null>();
 
     if (!log) {
       return;
     }
 
+    let updatedTags = log.tags || [];
+
+    if (updatedTags.length === 0) {
+      const textToTag = log.aiSummary || log.rawTranscript || "";
+      if (textToTag) {
+        try {
+          const system = `You are a productivity AI. Generate 2-4 short, specific metadata tags (1-2 words each) for this log in the category "${log.category}".
+Output ONLY a comma-separated list of tags in lowercase. No intro, no quotes. Example: "system design, load balancing, caching".`;
+          const result = await generateText({
+            model: openai("gpt-5-nano"),
+            system,
+            prompt: `Log content: "${textToTag.slice(0, 800)}"`,
+          });
+          const generatedText = result.text.trim();
+          if (generatedText) {
+            updatedTags = generatedText
+              .split(",")
+              .map((t) => t.trim())
+              .filter((t) => t.length > 0 && t.length <= 30);
+          }
+        } catch (tagError) {
+          console.warn("[COACH_TAG_GENERATION_ERROR]", tagError);
+        }
+      }
+    }
+
+    log.tags = updatedTags;
+
     const embeddingText = buildCoachRetrievalText(log);
     const embedding = await createCoachEmbedding(embeddingText, String(log.userId));
 
     await LogEntry.findByIdAndUpdate(logId, {
       $set: {
+        tags: updatedTags,
         coachEmbedding: embedding,
         embeddingModel: COACH_EMBEDDING_MODEL,
         embeddingDimensions: COACH_EMBEDDING_DIMENSIONS,

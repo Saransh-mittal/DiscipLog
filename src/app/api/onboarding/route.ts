@@ -24,7 +24,7 @@ export async function POST(req: Request) {
     }
 
     const result = await generateText({
-      model: openai("gpt-4o-mini"),
+      model: openai("gpt-5-nano"),
       system: `You parse a user's free-text description of how they spend their time into structured productivity categories.
 
 RULES:

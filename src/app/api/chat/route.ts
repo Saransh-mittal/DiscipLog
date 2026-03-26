@@ -322,6 +322,10 @@ async function buildSystemPrompt(input: {
     minute: "2-digit",
     hour12: true,
   }).format(now);
+
+  const weeklyDebriefText = baselineContext.latestWeeklyDebrief
+    ? `Title: ${baselineContext.latestWeeklyDebrief.weekTitle}\nNote: ${baselineContext.latestWeeklyDebrief.coachNote}\nChallenge: ${baselineContext.latestWeeklyDebrief.challengeForNextWeek}`
+    : "No recent debrief available.";
   const toolRecommendation =
     signals.wantsHistorical || signals.wantsStructuredStats
       ? "should-use-tools"
@@ -384,6 +388,9 @@ Baseline Stats:
 
 This Week's Progress (since ${baselineContext.weekStartDateKey}):
 ${weekSummary}
+
+Latest Weekly Debrief:
+${weeklyDebriefText}
 
 Lifetime Category Journey Snapshot:
 ${lifetimeSummary}

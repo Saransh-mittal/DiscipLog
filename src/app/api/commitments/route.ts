@@ -95,7 +95,7 @@ export async function PATCH(req: Request) {
       // AI-enhance the reason
       try {
         const result = await generateText({
-          model: openai("gpt-4o-mini"),
+          model: openai("gpt-5-nano"),
           system: `You refine a user's raw explanation for missing a weekly commitment into a clear, honest, accountable statement. Keep it concise (1-2 sentences). Don't add fluff or excuses. Maintain the user's voice but make it articulate. Output ONLY the refined statement, nothing else.`,
           prompt: `Commitment: "${commitment.text}"\nRaw reason: "${rawReason.trim()}"`,
         });

@@ -12,6 +12,7 @@ export interface IUserCategory {
   weeklyMaxTarget: number;
   icon: string;
   isSideCategory?: boolean;
+  isActive?: boolean;
 }
 
 export interface IUser extends Document {
@@ -39,6 +40,7 @@ const UserCategorySchema = new Schema(
     weeklyMaxTarget: { type: Number, required: true, min: 0 },
     icon: { type: String, required: true },
     isSideCategory: { type: Boolean, default: false },
+    isActive: { type: Boolean, default: true },
   },
   { _id: false }
 );
