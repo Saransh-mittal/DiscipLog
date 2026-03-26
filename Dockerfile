@@ -9,6 +9,8 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 # Use npm install instead of npm ci so NPM fetches the current OS's optional dependencies
 RUN npm install
+# Explicitly force-install the native bindings that NPM might omit from the lockfile transitive tree
+RUN npm install --no-save lightningcss-linux-x64-gnu
 
 # Rebuild the source code only when needed
 FROM base AS builder
