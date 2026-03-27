@@ -5,7 +5,15 @@ import {
   type StoredAIProfile,
 } from "@/lib/ai-profile";
 
+export interface ICategoryNote {
+  _id?: string;
+  text: string;
+  done: boolean;
+  createdAt: Date;
+}
+
 export interface IUserCategory {
+  _id?: string;
   name: string;
   dailyTargetHours: number;
   weeklyMinTarget: number;
@@ -14,6 +22,7 @@ export interface IUserCategory {
   isSideCategory?: boolean;
   isActive?: boolean;
   isArchived?: boolean;
+  notes?: ICategoryNote[];
 }
 
 export interface IUser extends Document {
@@ -33,6 +42,15 @@ export interface IUser extends Document {
   createdAt: Date;
 }
 
+const CategoryNoteSchema = new Schema(
+  {
+    text: { type: String, required: true, trim: true },
+    done: { type: Boolean, default: false },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: true }
+);
+
 const UserCategorySchema = new Schema(
   {
     name: { type: String, required: true },
@@ -43,8 +61,9 @@ const UserCategorySchema = new Schema(
     isSideCategory: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
     isArchived: { type: Boolean, default: false },
+    notes: { type: [CategoryNoteSchema], default: [] },
   },
-  { _id: false }
+  { _id: true }
 );
 
 const AIProfileSchema = new Schema(

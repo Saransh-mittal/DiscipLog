@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
+import mongoose from "mongoose";
 import { authOptions } from "../auth/[...nextauth]/route";
 import connectToDatabase from "@/lib/mongoose";
 import User from "@/models/User";
@@ -15,7 +16,21 @@ export async function GET() {
     await connectToDatabase();
     const user = await User.findById(userId).lean();
 
-    return NextResponse.json(user?.categories || []);
+    // Backfill _id for categories that were created before _id was enabled
+    const categories = user?.categories || [];
+    const needsBackfill = categories.some(
+      (c: { _id?: unknown }) => !c._id
+    );
+    if (needsBackfill && user) {
+      const patched = categories.map((c: { _id?: unknown }) => ({
+        ...c,
+        _id: c._id || new mongoose.Types.ObjectId(),
+      }));
+      await User.findByIdAndUpdate(userId, { categories: patched });
+      return NextResponse.json(patched);
+    }
+
+    return NextResponse.json(categories);
   } catch (error) {
     console.error("[CATEGORIES_GET_ERROR]", error);
     return new NextResponse("Failed to fetch categories", { status: 500 });

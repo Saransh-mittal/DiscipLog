@@ -2321,3 +2321,271 @@ input[type="number"] {
   color: var(--v2-text-muted);
   margin-top: 0.5rem;
 }
+
+/* ══════════════════════════════════════════════════════
+   CATEGORY NOTES — Modal + Card Button
+   ══════════════════════════════════════════════════════ */
+
+/* ── Card-level trigger button ── */
+.catnotes-card-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  margin-top: 0.5rem;
+  padding: 0.25rem 0.5rem;
+  border-radius: 6px;
+  border: 1px solid;
+  background: transparent;
+  font-family: var(--font-body);
+  font-size: 0.5625rem;
+  font-weight: 600;
+  color: var(--v2-text-muted);
+  cursor: pointer;
+  transition: all 150ms ease;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.catnotes-card-btn:hover {
+  background: var(--v2-surface-overlay);
+  color: var(--v2-text-secondary);
+}
+.catnotes-card-count {
+  font-family: var(--font-body);
+  font-size: 0.5rem;
+  font-weight: 800;
+  min-width: 14px;
+  height: 14px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 999px;
+  padding: 0 0.2rem;
+}
+
+/* ── Modal backdrop ── */
+.catnotes-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: oklch(0 0 0 / 55%);
+  backdrop-filter: blur(6px);
+  -webkit-backdrop-filter: blur(6px);
+  animation: catnotes-fade-in 150ms ease;
+}
+@keyframes catnotes-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* ── Modal dialog ── */
+.catnotes-modal {
+  background: var(--v2-surface-card, oklch(0.14 0.01 260));
+  border: 1px solid;
+  max-width: 420px;
+  width: 90vw;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: catnotes-slide-up 200ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+@keyframes catnotes-slide-up {
+  from { opacity: 0; transform: translateY(12px) scale(0.97); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.catnotes-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.25rem 0.875rem;
+  border-bottom: 1px solid var(--v2-border);
+}
+.catnotes-modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.625rem;
+}
+.catnotes-modal-icon {
+  width: 34px;
+  height: 34px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  background: var(--v2-surface-overlay);
+}
+.catnotes-modal-title {
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+.catnotes-modal-subtitle {
+  font-family: var(--font-body);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--v2-text-muted);
+  margin: 0.125rem 0 0;
+}
+.catnotes-modal-close {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 8px;
+  border: 1px solid var(--v2-border);
+  background: var(--v2-surface-raised);
+  color: var(--v2-text-muted);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.catnotes-modal-close:hover {
+  color: var(--v2-text-primary);
+  border-color: var(--v2-border-strong);
+}
+
+/* ── Modal body ── */
+.catnotes-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.875rem 1.25rem;
+}
+.catnotes-modal-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1.5rem 0;
+}
+.catnotes-modal-empty p {
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  color: var(--v2-text-muted);
+  font-style: italic;
+  margin: 0;
+}
+.catnotes-modal-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+.catnotes-modal-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem 0.375rem;
+  border-radius: 8px;
+  transition: background 150ms ease;
+}
+.catnotes-modal-item:hover {
+  background: var(--v2-surface-overlay);
+}
+.catnotes-modal-text {
+  flex: 1;
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  line-height: 1.5;
+  color: var(--v2-text-secondary);
+  transition: color 200ms ease, opacity 200ms ease;
+}
+.catnotes-modal-text.done {
+  text-decoration: line-through;
+  opacity: 0.45;
+  color: var(--v2-text-muted);
+}
+.catnotes-modal-delete {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  border: none;
+  background: transparent;
+  color: var(--v2-rose-400);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 150ms ease;
+}
+.catnotes-modal-item:hover .catnotes-modal-delete {
+  opacity: 0.5;
+}
+.catnotes-modal-delete:hover {
+  opacity: 1 !important;
+  background: oklch(0.60 0.20 18 / 10%);
+}
+
+/* ── Shared checkbox ── */
+.catnotes-checkbox {
+  flex-shrink: 0;
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  margin-top: 1px;
+  transition: transform 150ms ease;
+}
+.catnotes-checkbox:active {
+  transform: scale(0.85);
+}
+
+/* ── Modal footer (add input) ── */
+.catnotes-modal-footer {
+  display: flex;
+  gap: 0.375rem;
+  padding: 0.75rem 1.25rem;
+  border-top: 1px solid var(--v2-border);
+}
+.catnotes-modal-input {
+  flex: 1;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--v2-border);
+  background: var(--v2-surface-raised);
+  color: var(--v2-text-primary);
+  font-family: var(--font-body);
+  font-size: 0.8125rem;
+  padding: 0 0.75rem;
+  outline: none;
+  transition: border-color 200ms ease;
+}
+.catnotes-modal-input:focus {
+  border-color: color-mix(in oklch, var(--world-accent) 30%, transparent);
+}
+.catnotes-modal-input::placeholder {
+  color: var(--v2-text-muted);
+  font-style: italic;
+}
+.catnotes-modal-input:disabled {
+  opacity: 0.5;
+}
+.catnotes-modal-add-btn {
+  width: 36px;
+  height: 36px;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 10px;
+  border: 1px solid var(--v2-border-strong);
+  background: var(--v2-surface-raised);
+  color: var(--v2-text-muted);
+  cursor: pointer;
+  transition: all 150ms ease;
+}
+.catnotes-modal-add-btn:not(:disabled) {
+  color: var(--v2-obsidian-900);
+  border-color: transparent;
+}
+.catnotes-modal-add-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}

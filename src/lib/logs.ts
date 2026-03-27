@@ -18,8 +18,17 @@ export type LogSource = (typeof LOG_SOURCES)[number];
 export type SprintCompletionStatus =
   (typeof SPRINT_COMPLETION_STATUSES)[number];
 
+// Note item within a category
+export interface CategoryNote {
+  _id?: string;
+  text: string;
+  done: boolean;
+  createdAt?: string;
+}
+
 // Dynamic user-defined category
 export interface UserCategory {
+  _id?: string;
   name: string;
   dailyTargetHours: number;
   weeklyMinTarget: number;
@@ -27,6 +36,7 @@ export interface UserCategory {
   icon: string;
   isSideCategory?: boolean;
   isArchived?: boolean;
+  notes?: CategoryNote[];
 }
 
 export interface DashboardLog {

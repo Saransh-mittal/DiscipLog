@@ -81,10 +81,14 @@ function formatCategoryTargets(categories: UserCategory[]): string {
   }
 
   return categories
-    .map(
-      (category) =>
-        `- ${category.name}: ${category.weeklyMinTarget}–${category.weeklyMaxTarget} hrs/week (daily target: ${category.dailyTargetHours}h)`
-    )
+    .map((category) => {
+      let line = `- ${category.name}: ${category.weeklyMinTarget}–${category.weeklyMaxTarget} hrs/week (daily target: ${category.dailyTargetHours}h)`;
+      const pendingNotes = (category.notes || []).filter((n) => !n.done);
+      if (pendingNotes.length > 0) {
+        line += `\n  Planned next steps: ${pendingNotes.map((n) => n.text).join("; ")}`;
+      }
+      return line;
+    })
     .join("\n");
 }
 
