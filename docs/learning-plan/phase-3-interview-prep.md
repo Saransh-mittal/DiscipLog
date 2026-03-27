@@ -13,8 +13,8 @@ The monolith is a deliberate bet on **iteration speed over operational complexit
 - No service discovery, no API gateways, no cross-service auth
 
 **The real trade-off emerges at scale:**
-1. **Memory evaluation background jobs** (`runImplicitMemoryEvaluation`) currently run inside the same serverless function that served the request. With Vercel's serverless model, the function *can* be killed before `queueMicrotask` completes. You don't have a background worker — you have a fire-and-forget inside an HTTP response lifecycle. This is acceptable for low-volume but brittle at scale.
-2. **The first service I'd extract:** The implicit memory evaluation loop — into a proper queue worker (e.g., an inngest.com function, or a Vercel Cron Job hitting a dedicated route). The API route handler should only *enqueue* the job, not execute it.
+1. **Memory evaluation background jobs** (`runImplicitMemoryEvaluation`) currently run inline using `queueMicrotask`. Because you are deployed on **Railway using a Docker container** (a long-running Node.js process), this fire-and-forget pattern is actually quite safe—the container doesn't freeze when the HTTP response ends (unlike serverless). However, at scale, if the Node container restarts or crashes while a background task is running, that task is lost forever since it's only in memory.
+2. **The first service I'd extract:** The implicit memory evaluation loop — into a proper persistent background worker using a message queue (e.g., Redis + BullMQ) so background jobs survive container deployments and restarts.
 
 ---
 
@@ -30,8 +30,8 @@ The Vercel AI SDK's `result.toUIMessageStreamResponse()` uses SSE (HTTP/1.1 chun
 **Why SSE wins here:**
 - SSE is unidirectional (server → client), which matches the AI stream direction perfectly. No need for bidirectional communication.
 - SSE reconnects automatically on drop. WebSockets need custom reconnect logic.
-- SSE works over standard HTTP/2, which multiplexes well. Vercel's CDN/edge handles SSE natively.
-- SSE responses are stateless — each chat turn is a fresh HTTP request. This is perfectly aligned with serverless (no persistent connection state to manage).
+- SSE routes seamlessly through Railway's edge proxy without needing specialized WebSocket load-balancing or timeout configurations.
+- SSE is inherently simpler to scale horizontally across multiple Docker containers than WebSockets, as it doesn't require "sticky sessions" or a pub/sub backplane (like Redis) just to stream data.
 
 **What SSE costs you:**
 - Browser limit: HTTP/1.1 allows only ~6 concurrent SSE connections per domain. Not a real limit since you only have one chat stream at a time.

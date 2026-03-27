@@ -73,7 +73,7 @@ Parsed by getStoredAIProfile(input: unknown): StoredAIProfile
 - **"Fire & forget = queueMicrotask → void fn()"** — memory eval runs AFTER response, off critical path
 - **"as const + [number] = type vending machine"** — single array → frozen literals → union type derived. One source of truth for DB enum + TS type.
 - **"Discriminated union: { ok: true; value: T } | { ok: false; error: string }"** — forces the caller to handle both paths. TypeScript narrows inside if-branch. Called "Railway-Oriented Programming."
-- **"Optimistic locking in Mongo: findOneAndUpdate({ field: { $ne: true } }, ...)"** — atomic compare-and-swap. Returns null if already claimed. Prevents race conditions in serverless.
+- **"Optimistic locking in Mongo: findOneAndUpdate({ field: { $ne: true } }, ...)"** — atomic compare-and-swap. Returns null if already claimed. Prevents race conditions across Docker containers.
 
 ---
 

@@ -6,18 +6,21 @@ import {
   useEffect,
   useState,
   useCallback,
+  useMemo,
   type ReactNode,
 } from "react";
 import type { UserCategory } from "@/lib/logs";
 
 interface CategoriesContextValue {
   categories: UserCategory[];
+  allCategories: UserCategory[];
   loading: boolean;
   refreshCategories: () => void;
 }
 
 const CategoriesContext = createContext<CategoriesContextValue>({
   categories: [],
+  allCategories: [],
   loading: true,
   refreshCategories: () => {},
 });
@@ -27,7 +30,7 @@ export function useCategoriesContext() {
 }
 
 export function CategoriesProvider({ children }: { children: ReactNode }) {
-  const [categories, setCategories] = useState<UserCategory[]>([]);
+  const [allCategories, setAllCategories] = useState<UserCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
   const fetchCategories = useCallback(() => {
@@ -35,7 +38,7 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     fetch("/api/categories")
       .then((res) => res.json())
       .then((data) => {
-        setCategories(Array.isArray(data) ? data : []);
+        setAllCategories(Array.isArray(data) ? data : []);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -45,9 +48,14 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     fetchCategories();
   }, [fetchCategories]);
 
+  const categories = useMemo(
+    () => allCategories.filter((c) => !c.isArchived),
+    [allCategories]
+  );
+
   return (
     <CategoriesContext.Provider
-      value={{ categories, loading, refreshCategories: fetchCategories }}
+      value={{ categories, allCategories, loading, refreshCategories: fetchCategories }}
     >
       {children}
     </CategoriesContext.Provider>

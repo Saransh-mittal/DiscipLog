@@ -13,6 +13,7 @@ export interface IUserCategory {
   icon: string;
   isSideCategory?: boolean;
   isActive?: boolean;
+  isArchived?: boolean;
 }
 
 export interface IUser extends Document {
@@ -41,6 +42,7 @@ const UserCategorySchema = new Schema(
     icon: { type: String, required: true },
     isSideCategory: { type: Boolean, default: false },
     isActive: { type: Boolean, default: true },
+    isArchived: { type: Boolean, default: false },
   },
   { _id: false }
 );
@@ -71,8 +73,9 @@ const UserSchema: Schema = new Schema({
     type: [UserCategorySchema],
     default: [],
     validate: {
-      validator: (arr: IUserCategory[]) => arr.length <= 7,
-      message: "Maximum 7 categories allowed",
+      validator: (arr: IUserCategory[]) =>
+        arr.filter((c) => !c.isArchived).length <= 8,
+      message: "Maximum 8 active categories allowed",
     },
   },
   aiProfile: {

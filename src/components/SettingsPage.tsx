@@ -16,6 +16,9 @@ import {
   Zap,
   Bell,
   BellOff,
+  Archive,
+  ArchiveRestore,
+  ChevronDown,
   type LucideIcon,
 } from "lucide-react";
 import { usePushNotifications } from "@/hooks/usePushNotifications";
@@ -42,13 +45,19 @@ function getErrorMessage(error: unknown, fallback: string): string {
 }
 
 export default function SettingsPage() {
-  const { categories, refreshCategories } = useCategoriesContext();
+  const { categories, allCategories, refreshCategories } = useCategoriesContext();
   const [localCategories, setLocalCategories] = useState<UserCategory[]>([]);
+  const [localArchived, setLocalArchived] = useState<UserCategory[]>([]);
+  const [showArchived, setShowArchived] = useState(false);
   const [categoriesSaving, setCategoriesSaving] = useState(false);
   const [categoriesError, setCategoriesError] = useState("");
   const [categoriesSuccess, setCategoriesSuccess] = useState(false);
   const [addText, setAddText] = useState("");
   const [addingAI, setAddingAI] = useState(false);
+  const [pendingAction, setPendingAction] = useState<{
+    type: "archive" | "delete";
+    index: number;
+  } | null>(null);
 
   const [profile, setProfile] = useState<ExplicitAIProfile>(
     getDefaultExplicitAIProfile()
@@ -67,7 +76,8 @@ export default function SettingsPage() {
 
   useEffect(() => {
     setLocalCategories(categories);
-  }, [categories]);
+    setLocalArchived(allCategories.filter((c) => c.isArchived));
+  }, [categories, allCategories]);
 
   useEffect(() => {
     const loadProfile = async () => {
@@ -110,10 +120,15 @@ export default function SettingsPage() {
     setCategoriesSuccess(false);
 
     try {
+      // Merge active + archived categories for the save
+      const allCats = [
+        ...localCategories.map((c) => ({ ...c, isArchived: false })),
+        ...localArchived.map((c) => ({ ...c, isArchived: true })),
+      ];
       const res = await fetch("/api/categories", {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ categories: localCategories }),
+        body: JSON.stringify({ categories: allCats }),
       });
 
       if (!res.ok) throw new Error(await res.text());
@@ -187,10 +202,28 @@ export default function SettingsPage() {
 
   const removeCat = (index: number) => {
     setLocalCategories((prev) => prev.filter((_, i) => i !== index));
+    setPendingAction(null);
+  };
+
+  const archiveCat = (index: number) => {
+    const cat = localCategories[index];
+    setLocalCategories((prev) => prev.filter((_, i) => i !== index));
+    setLocalArchived((prev) => [...prev, { ...cat, isArchived: true }]);
+    setPendingAction(null);
+  };
+
+  const unarchiveCat = (index: number) => {
+    if (localCategories.length >= 8) {
+      setCategoriesError("Unarchive failed: you already have 8 active categories.");
+      return;
+    }
+    const cat = localArchived[index];
+    setLocalArchived((prev) => prev.filter((_, i) => i !== index));
+    setLocalCategories((prev) => [...prev, { ...cat, isArchived: false }]);
   };
 
   const addManual = () => {
-    if (localCategories.length >= 7) return;
+    if (localCategories.length >= 8) return;
     setLocalCategories((prev) => [
       ...prev,
       {
@@ -205,7 +238,7 @@ export default function SettingsPage() {
   };
 
   const addWithAI = async () => {
-    if (!addText.trim() || localCategories.length >= 7) return;
+    if (!addText.trim() || localCategories.length >= 8) return;
     setAddingAI(true);
     setCategoriesError("");
     try {
@@ -216,7 +249,7 @@ export default function SettingsPage() {
       });
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
-      const remaining = 7 - localCategories.length;
+      const remaining = 8 - localCategories.length;
       const newCats = (data.categories || []).slice(0, remaining);
       setLocalCategories((prev) => [...prev, ...newCats]);
       setAddText("");
@@ -243,19 +276,47 @@ export default function SettingsPage() {
     setProfile((prev) => ({ ...prev, [field]: value }));
   };
 
+  const archivedFromContext = allCategories.filter((c) => c.isArchived);
   const categoryHasChanges =
-    JSON.stringify(localCategories) !== JSON.stringify(categories);
+    JSON.stringify(localCategories) !== JSON.stringify(categories) ||
+    JSON.stringify(localArchived) !== JSON.stringify(archivedFromContext);
   const profileHasChanges =
     JSON.stringify(profile) !== JSON.stringify(savedProfile);
+
+  const activeOnly = localCategories.filter((c) => !c.isArchived);
+  const totalDaily = activeOnly.reduce(
+    (sum, cat) => sum + (Number(cat.dailyTargetHours) || 0),
+    0
+  );
+  const totalWeeklyMin = activeOnly.reduce(
+    (sum, cat) => sum + (Number(cat.weeklyMinTarget) || 0),
+    0
+  );
+  const totalWeeklyMax = activeOnly.reduce(
+    (sum, cat) => sum + (Number(cat.weeklyMaxTarget) || 0),
+    0
+  );
 
   return (
     <div className="settings-stack">
       {/* ─── Categories Section ─── */}
       <div className="settings-section v2-stagger-in v2-stagger-1">
         <div className="settings-section-header">
-          <h3 className="settings-section-title">Categories</h3>
+          <div>
+            <h3 className="settings-section-title">Categories</h3>
+            <p
+              style={{
+                color: "var(--v2-text-muted)",
+                fontSize: "0.8125rem",
+                marginTop: "0.25rem",
+                fontWeight: 500,
+              }}
+            >
+              Daily Total: {totalDaily}h <span style={{ opacity: 0.5, margin: "0 0.375rem" }}>&bull;</span> Weekly Total: {totalWeeklyMin}h &ndash; {totalWeeklyMax}h
+            </p>
+          </div>
           <span className="settings-count-badge">
-            {localCategories.length} / 7
+            {localCategories.length} / 8
           </span>
         </div>
 
@@ -342,19 +403,30 @@ export default function SettingsPage() {
                 </div>
               </div>
 
-              {/* Delete */}
-              <button
-                onClick={() => removeCat(i)}
-                className="settings-cat-delete"
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
+              {/* Archive + Delete */}
+              <div className="flex items-center gap-1">
+                <button
+                  onClick={() => setPendingAction({ type: "archive", index: i })}
+                  className="settings-cat-delete"
+                  title="Archive category"
+                  style={{ color: "var(--v2-text-muted)" }}
+                >
+                  <Archive className="w-3.5 h-3.5" />
+                </button>
+                <button
+                  onClick={() => setPendingAction({ type: "delete", index: i })}
+                  className="settings-cat-delete"
+                  title="Delete category permanently"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
             </div>
           ))}
         </div>
 
         {/* Add category */}
-        {localCategories.length < 7 && (
+        {localCategories.length < 8 && (
           <div className="settings-add-area">
             <div className="settings-add-row">
               <Input
@@ -410,6 +482,228 @@ export default function SettingsPage() {
               ? "Save Categories"
               : "No Changes"}
         </Button>
+
+        {/* Archived Categories Panel */}
+        {localArchived.length > 0 && (
+          <div style={{ marginTop: "1rem" }}>
+            <button
+              onClick={() => setShowArchived((v) => !v)}
+              className="settings-add-manual"
+              style={{
+                width: "100%",
+                justifyContent: "space-between",
+                padding: "0.625rem 0.75rem",
+                marginBottom: showArchived ? "0.75rem" : 0,
+              }}
+            >
+              <span style={{ display: "flex", alignItems: "center", gap: "0.375rem" }}>
+                <Archive className="w-3.5 h-3.5" />
+                Archived ({localArchived.length})
+              </span>
+              <ChevronDown
+                className="w-3.5 h-3.5"
+                style={{
+                  transition: "transform 200ms ease",
+                  transform: showArchived ? "rotate(180deg)" : "rotate(0deg)",
+                }}
+              />
+            </button>
+
+            {showArchived && (
+              <div className="settings-cat-list" style={{ opacity: 0.75 }}>
+                {localArchived.map((cat, i) => (
+                  <div
+                    key={`archived-${i}`}
+                    className="settings-cat-row group"
+                    style={{ opacity: 0.8 }}
+                  >
+                    <div className="settings-cat-icon">
+                      <DynamicIcon name={cat.icon} className="w-4.5 h-4.5" />
+                    </div>
+                    <div className="settings-cat-info" style={{ flex: 1 }}>
+                      <span
+                        style={{
+                          color: "var(--v2-text-muted)",
+                          fontSize: "0.875rem",
+                          fontWeight: 600,
+                          fontFamily: "var(--font-body)",
+                        }}
+                      >
+                        {cat.name}
+                      </span>
+                    </div>
+                    <button
+                      onClick={() => unarchiveCat(i)}
+                      className="settings-cat-delete"
+                      title="Restore category"
+                      style={{ color: "var(--v2-sage-400)" }}
+                    >
+                      <ArchiveRestore className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Confirmation Modal */}
+        {pendingAction && localCategories[pendingAction.index] && (
+          <div
+            style={{
+              position: "fixed",
+              inset: 0,
+              zIndex: 9999,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              background: "oklch(0 0 0 / 60%)",
+              backdropFilter: "blur(6px)",
+            }}
+            onClick={() => setPendingAction(null)}
+          >
+            <div
+              onClick={(e) => e.stopPropagation()}
+              style={{
+                background: "var(--v2-surface-card, oklch(0.16 0.01 260))",
+                border: "1px solid var(--v2-border, oklch(1 0 0 / 8%))",
+                borderRadius: "16px",
+                padding: "1.5rem",
+                maxWidth: "380px",
+                width: "90vw",
+              }}
+            >
+              {/* Header */}
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
+                {pendingAction.type === "archive" ? (
+                  <Archive className="w-4.5 h-4.5" style={{ color: "var(--v2-text-muted)" }} />
+                ) : (
+                  <Trash2 className="w-4.5 h-4.5" style={{ color: "oklch(0.65 0.18 18)" }} />
+                )}
+                <h4
+                  style={{
+                    fontFamily: "var(--font-display)",
+                    fontSize: "1rem",
+                    fontWeight: 800,
+                    color: "var(--v2-text-primary)",
+                    margin: 0,
+                  }}
+                >
+                  {pendingAction.type === "archive" ? "Archive Category?" : "Delete Category?"}
+                </h4>
+                {pendingAction.type === "delete" && (
+                  <span
+                    style={{
+                      fontSize: "0.625rem",
+                      fontWeight: 700,
+                      textTransform: "uppercase",
+                      letterSpacing: "0.08em",
+                      color: "oklch(0.65 0.18 18)",
+                      background: "oklch(0.60 0.20 18 / 12%)",
+                      border: "1px solid oklch(0.60 0.20 18 / 25%)",
+                      borderRadius: "6px",
+                      padding: "0.125rem 0.5rem",
+                      fontFamily: "var(--font-body)",
+                    }}
+                  >
+                    Dangerous
+                  </span>
+                )}
+              </div>
+
+              {/* Body */}
+              <p
+                style={{
+                  fontFamily: "var(--font-body)",
+                  fontSize: "0.8125rem",
+                  color: "var(--v2-text-secondary)",
+                  lineHeight: 1.6,
+                  margin: "0 0 1.25rem 0",
+                }}
+              >
+                {pendingAction.type === "archive" ? (
+                  <>
+                    <strong style={{ color: "var(--v2-text-primary)" }}>
+                      {localCategories[pendingAction.index]?.name || "this category"}
+                    </strong>{" "}
+                    will be hidden from your dashboard and logger. Any hours already logged will appear as &ldquo;Archived&rdquo; on your overview. You can restore it anytime.
+                  </>
+                ) : (
+                  <>
+                    <strong style={{ color: "var(--v2-text-primary)" }}>
+                      {localCategories[pendingAction.index]?.name || "this category"}
+                    </strong>{" "}
+                    will be permanently removed. Your existing logs won&rsquo;t be deleted, but the category definition will be gone forever. This cannot be undone.
+                  </>
+                )}
+              </p>
+
+              {/* Actions */}
+              <div style={{ display: "flex", gap: "0.5rem", justifyContent: "flex-end" }}>
+                <button
+                  onClick={() => setPendingAction(null)}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.375rem",
+                    height: "2.25rem",
+                    padding: "0 1rem",
+                    borderRadius: "10px",
+                    border: "1px solid var(--v2-border, oklch(1 0 0 / 10%))",
+                    background: "var(--v2-surface-raised, oklch(0.18 0.01 260))",
+                    color: "var(--v2-text-secondary, oklch(0.7 0.02 260))",
+                    fontSize: "0.8125rem",
+                    fontWeight: 600,
+                    fontFamily: "var(--font-body)",
+                    cursor: "pointer",
+                    transition: "all 150ms ease",
+                  }}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={() => {
+                    if (pendingAction.type === "archive") {
+                      archiveCat(pendingAction.index);
+                    } else {
+                      removeCat(pendingAction.index);
+                    }
+                  }}
+                  style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    gap: "0.375rem",
+                    height: "2.25rem",
+                    padding: "0 1rem",
+                    borderRadius: "10px",
+                    border: pendingAction.type === "delete"
+                      ? "1px solid oklch(0.60 0.20 18 / 40%)"
+                      : "1px solid var(--v2-border, oklch(1 0 0 / 10%))",
+                    background: pendingAction.type === "delete"
+                      ? "linear-gradient(135deg, oklch(0.50 0.20 18), oklch(0.40 0.18 18))"
+                      : "var(--v2-surface-raised, oklch(0.18 0.01 260))",
+                    color: pendingAction.type === "delete"
+                      ? "#fff"
+                      : "var(--v2-text-primary, oklch(0.9 0.01 260))",
+                    fontSize: "0.8125rem",
+                    fontWeight: 700,
+                    fontFamily: "var(--font-body)",
+                    cursor: "pointer",
+                    transition: "all 150ms ease",
+                  }}
+                >
+                  {pendingAction.type === "archive" ? (
+                    <><Archive className="w-3.5 h-3.5" /> Archive</>
+                  ) : (
+                    <><Trash2 className="w-3.5 h-3.5" /> Delete Forever</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* ─── AI Coach Section ─── */}

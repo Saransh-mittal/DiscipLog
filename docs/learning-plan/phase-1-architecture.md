@@ -88,7 +88,7 @@ const claimedUser = await User.findOneAndUpdate(
 
 if (!claimedUser) return; // Another instance already claimed it
 ```
-**Why this is excellent:** In a serverless environment (Vercel), multiple function instances can run simultaneously for the same user. This atomic compare-and-swap pattern prevents two concurrent requests from both triggering an expensive memory re-evaluation and creating a double-write. This is a distributed systems technique (optimistic locking) applied correctly inside MongoDB.
+**Why this is excellent:** In a distributed Docker environment like Railway, multiple container instances can run simultaneously and handle requests for the same user. This atomic compare-and-swap pattern prevents two concurrent requests (even if they hit different containers) from both triggering an expensive memory re-evaluation and creating a double-write. This is a classic distributed systems technique (optimistic locking) applied correctly inside MongoDB.
 
 ---
 

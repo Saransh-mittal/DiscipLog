@@ -36,8 +36,8 @@ export async function PUT(req: Request) {
       return new NextResponse("Invalid categories payload", { status: 400 });
     }
 
-    if (categories.length > 7) {
-      return new NextResponse("Maximum 7 categories allowed", { status: 400 });
+    if (categories.filter((c: { isArchived?: boolean }) => !c.isArchived).length > 8) {
+      return new NextResponse("Maximum 8 active categories allowed", { status: 400 });
     }
 
     // Validate each category

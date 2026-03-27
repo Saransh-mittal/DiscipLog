@@ -26,6 +26,7 @@ export interface UserCategory {
   weeklyMaxTarget: number;
   icon: string;
   isSideCategory?: boolean;
+  isArchived?: boolean;
 }
 
 export interface DashboardLog {

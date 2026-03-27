@@ -1,6 +1,7 @@
 "use client";
 
 import { Badge } from "@/components/ui/badge";
+import { Archive } from "lucide-react";
 import { useCategoriesContext } from "@/components/CategoriesProvider";
 import DynamicIcon from "@/components/DynamicIcon";
 import { useMomentum } from "@/components/MomentumProvider";
@@ -21,6 +22,12 @@ export default function WeeklyProgressV2() {
   const { progressShimmer } = microInteractions;
 
   const barGlowThreshold = streakPower >= 3 ? 30 : 60;
+
+  // Compute orphaned hours from archived/removed categories
+  const activeCatNames = new Set(categories.map((c) => c.name));
+  const archivedHours = Object.entries(weeklyByCategory)
+    .filter(([name]) => !activeCatNames.has(name))
+    .reduce((sum, [, hours]) => sum + hours, 0);
 
   return (
     <CardSkin className="relative overflow-hidden" style={{ padding: 0 }}>
@@ -166,6 +173,52 @@ export default function WeeklyProgressV2() {
               </div>
             );
           })}
+
+          {/* Archived aggregate row */}
+          {!isLoading && archivedHours > 0 && (
+            <div style={{ opacity: 0.6 }}>
+              <div className="flex items-center justify-between mb-2">
+                <div className="flex items-center gap-2.5">
+                  <div
+                    className="p-1.5 rounded-lg"
+                    style={{ background: theme.surfaceRaised }}
+                  >
+                    <Archive
+                      className="w-3.5 h-3.5"
+                      style={{ color: theme.textMuted }}
+                    />
+                  </div>
+                  <span className="text-sm font-semibold" style={{ fontFamily: "var(--font-body)", color: theme.textMuted }}>
+                    Archived
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <span
+                    className="text-xs font-bold tabular-nums"
+                    style={{
+                      fontFamily: "var(--font-display)",
+                      color: theme.textMuted,
+                    }}
+                  >
+                    {archivedHours.toFixed(2)}h
+                  </span>
+                  <Badge
+                    variant="outline"
+                    className="text-[9px] px-1.5 py-0 border"
+                    style={{
+                      borderColor: "transparent",
+                      color: theme.textMuted,
+                      background: theme.surfaceRaised,
+                      fontFamily: "var(--font-body)",
+                    }}
+                  >
+                    Carried
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     </CardSkin>
