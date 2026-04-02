@@ -13,6 +13,12 @@ import {
   scheduleCoachEmbeddingBackfill,
   scheduleCoachEmbeddingRefreshForLog,
 } from "@/lib/coach-embeddings";
+import {
+  deleteSmartRecallCardsForLog,
+  getPendingSmartRecallEligibility,
+  scheduleSmartRecallEligibilityBackfill,
+  scheduleSmartRecallEligibilityRefresh,
+} from "@/lib/smart-recall";
 import LogEntry from "@/models/LogEntry";
 
 function getErrorMessage(error: unknown) {
@@ -69,10 +75,14 @@ export async function PATCH(
     log.aiSummary = aiSummary.trim();
     log.loggedAt = parsedLoggedAt;
     log.date = deriveLogDate(parsedLoggedAt, timezone);
+    log.smartRecallEligibility = getPendingSmartRecallEligibility();
 
     await log.save();
+    await deleteSmartRecallCardsForLog(String(log._id));
     scheduleCoachEmbeddingRefreshForLog(String(log._id));
     scheduleCoachEmbeddingBackfill(userId);
+    scheduleSmartRecallEligibilityRefresh(String(log._id));
+    scheduleSmartRecallEligibilityBackfill(userId);
 
     return NextResponse.json(log);
   } catch (error: unknown) {
@@ -121,6 +131,8 @@ export async function DELETE(
     if (!deletedLog) {
       return new NextResponse("Not Found", { status: 404 });
     }
+
+    await deleteSmartRecallCardsForLog(id);
 
     return NextResponse.json({ ok: true });
   } catch (error: unknown) {

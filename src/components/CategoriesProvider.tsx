@@ -16,6 +16,10 @@ interface CategoriesContextValue {
   allCategories: UserCategory[];
   loading: boolean;
   refreshCategories: () => void;
+  updateCategory: (
+    categoryId: string,
+    updater: (category: UserCategory) => UserCategory
+  ) => void;
 }
 
 const CategoriesContext = createContext<CategoriesContextValue>({
@@ -23,6 +27,7 @@ const CategoriesContext = createContext<CategoriesContextValue>({
   allCategories: [],
   loading: true,
   refreshCategories: () => {},
+  updateCategory: () => {},
 });
 
 export function useCategoriesContext() {
@@ -33,8 +38,11 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   const [allCategories, setAllCategories] = useState<UserCategory[]>([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchCategories = useCallback(() => {
-    setLoading(true);
+  const fetchCategories = useCallback((showLoading = true) => {
+    if (showLoading) {
+      setLoading(true);
+    }
+
     fetch("/api/categories")
       .then((res) => res.json())
       .then((data) => {
@@ -45,7 +53,9 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
   }, []);
 
   useEffect(() => {
-    fetchCategories();
+    void Promise.resolve().then(() => {
+      fetchCategories(false);
+    });
   }, [fetchCategories]);
 
   const categories = useMemo(
@@ -53,9 +63,26 @@ export function CategoriesProvider({ children }: { children: ReactNode }) {
     [allCategories]
   );
 
+  const updateCategory = useCallback(
+    (categoryId: string, updater: (category: UserCategory) => UserCategory) => {
+      setAllCategories((prev) =>
+        prev.map((category) =>
+          String(category._id) === categoryId ? updater(category) : category
+        )
+      );
+    },
+    []
+  );
+
   return (
     <CategoriesContext.Provider
-      value={{ categories, allCategories, loading, refreshCategories: fetchCategories }}
+      value={{
+        categories,
+        allCategories,
+        loading,
+        refreshCategories: fetchCategories,
+        updateCategory,
+      }}
     >
       {children}
     </CategoriesContext.Provider>

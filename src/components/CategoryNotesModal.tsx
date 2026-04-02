@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useCallback, useEffect } from "react";
+import { useState, useRef, useCallback, useEffect, useMemo } from "react";
 import { createPortal } from "react-dom";
 import {
   X,
@@ -10,9 +10,12 @@ import {
   Circle,
   StickyNote,
   Loader2,
+  Pencil,
+  Check,
 } from "lucide-react";
 import DynamicIcon from "@/components/DynamicIcon";
 import type { CategoryNote, UserCategory } from "@/lib/logs";
+import { useCategoriesContext } from "@/components/CategoriesProvider";
 
 interface CategoryNotesModalProps {
   category: UserCategory;
@@ -33,14 +36,18 @@ export default function CategoryNotesModal({
   theme,
   onClose,
 }: CategoryNotesModalProps) {
-  const [notes, setNotes] = useState<CategoryNote[]>(category.notes || []);
   const [inputValue, setInputValue] = useState("");
   const [adding, setAdding] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingValue, setEditingValue] = useState("");
+  const [savingEdit, setSavingEdit] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
+  const { updateCategory, refreshCategories } = useCategoriesContext();
 
   // Ensure categoryId is always a plain string
   const categoryId = category._id ? String(category._id) : null;
+  const notes = useMemo(() => category.notes || [], [category.notes]);
 
   // Focus input on mount
   useEffect(() => {
@@ -80,22 +87,30 @@ export default function CategoryNotesModal({
         throw new Error(errText);
       }
       const newNote = await res.json();
-      setNotes((prev) => [...prev, newNote]);
+      updateCategory(categoryId, (currentCategory) => ({
+        ...currentCategory,
+        notes: [...(currentCategory.notes || []), newNote as CategoryNote],
+      }));
       setInputValue("");
       inputRef.current?.focus();
     } catch (err) {
       console.error("[NOTES_ADD_FAILED]", err);
+      refreshCategories();
     } finally {
       setAdding(false);
     }
-  }, [inputValue, adding, categoryId]);
+  }, [inputValue, adding, categoryId, updateCategory, refreshCategories]);
 
   const handleToggle = useCallback(
     async (noteId: string, done: boolean) => {
       if (!categoryId) return;
-      setNotes((prev) =>
-        prev.map((n) => (n._id === noteId ? { ...n, done } : n))
-      );
+      const previousNotes = notes;
+      updateCategory(categoryId, (currentCategory) => ({
+        ...currentCategory,
+        notes: (currentCategory.notes || []).map((note) =>
+          note._id === noteId ? { ...note, done } : note
+        ),
+      }));
       try {
         const res = await fetch("/api/categories/notes", {
           method: "PATCH",
@@ -104,19 +119,24 @@ export default function CategoryNotesModal({
         });
         if (!res.ok) throw new Error();
       } catch {
-        setNotes((prev) =>
-          prev.map((n) => (n._id === noteId ? { ...n, done: !done } : n))
-        );
+        updateCategory(categoryId, (currentCategory) => ({
+          ...currentCategory,
+          notes: previousNotes,
+        }));
+        refreshCategories();
       }
     },
-    [categoryId]
+    [categoryId, notes, refreshCategories, updateCategory]
   );
 
   const handleDelete = useCallback(
     async (noteId: string) => {
       if (!categoryId) return;
-      const prev = notes;
-      setNotes((old) => old.filter((n) => n._id !== noteId));
+      const previousNotes = notes;
+      updateCategory(categoryId, (currentCategory) => ({
+        ...currentCategory,
+        notes: (currentCategory.notes || []).filter((note) => note._id !== noteId),
+      }));
       try {
         const res = await fetch("/api/categories/notes", {
           method: "DELETE",
@@ -125,10 +145,79 @@ export default function CategoryNotesModal({
         });
         if (!res.ok) throw new Error();
       } catch {
-        setNotes(prev);
+        updateCategory(categoryId, (currentCategory) => ({
+          ...currentCategory,
+          notes: previousNotes,
+        }));
+        refreshCategories();
       }
     },
-    [categoryId, notes]
+    [categoryId, notes, refreshCategories, updateCategory]
+  );
+
+  const startEditing = useCallback((note: CategoryNote) => {
+    setEditingNoteId(note._id || null);
+    setEditingValue(note.text);
+  }, []);
+
+  const cancelEditing = useCallback(() => {
+    setEditingNoteId(null);
+    setEditingValue("");
+    setSavingEdit(false);
+  }, []);
+
+  const handleSaveEdit = useCallback(
+    async (noteId: string) => {
+      if (!categoryId) return;
+
+      const nextText = editingValue.trim();
+      const previousNotes = notes;
+
+      if (!nextText) {
+        cancelEditing();
+        return;
+      }
+
+      const existingNote = notes.find((note) => note._id === noteId);
+      if (!existingNote || existingNote.text === nextText) {
+        cancelEditing();
+        return;
+      }
+
+      setSavingEdit(true);
+      updateCategory(categoryId, (currentCategory) => ({
+        ...currentCategory,
+        notes: (currentCategory.notes || []).map((note) =>
+          note._id === noteId ? { ...note, text: nextText } : note
+        ),
+      }));
+
+      try {
+        const res = await fetch("/api/categories/notes", {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ categoryId, noteId, text: nextText }),
+        });
+
+        if (!res.ok) throw new Error();
+        cancelEditing();
+      } catch {
+        updateCategory(categoryId, (currentCategory) => ({
+          ...currentCategory,
+          notes: previousNotes,
+        }));
+        setSavingEdit(false);
+        refreshCategories();
+      }
+    },
+    [
+      cancelEditing,
+      categoryId,
+      editingValue,
+      notes,
+      refreshCategories,
+      updateCategory,
+    ]
   );
 
   const pendingNotes = notes.filter((n) => !n.done);
@@ -213,14 +302,56 @@ export default function CategoryNotesModal({
                       />
                     )}
                   </button>
-                  <span
-                    className={`catnotes-modal-text ${note.done ? "done" : ""}`}
-                  >
-                    {note.text}
-                  </span>
+                  {editingNoteId === note._id ? (
+                    <input
+                      value={editingValue}
+                      onChange={(e) => setEditingValue(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter") {
+                          void handleSaveEdit(note._id!);
+                        }
+                        if (e.key === "Escape") {
+                          cancelEditing();
+                        }
+                      }}
+                      className="catnotes-modal-input flex-1 min-w-0"
+                      disabled={savingEdit}
+                    />
+                  ) : (
+                    <span
+                      className={`catnotes-modal-text ${note.done ? "done" : ""}`}
+                    >
+                      {note.text}
+                    </span>
+                  )}
+                  {editingNoteId === note._id ? (
+                    <button
+                      className="catnotes-modal-delete"
+                      onClick={() => void handleSaveEdit(note._id!)}
+                      disabled={savingEdit}
+                      aria-label="Save note"
+                      title="Save note"
+                    >
+                      {savingEdit ? (
+                        <Loader2 className="w-3 h-3 animate-spin" />
+                      ) : (
+                        <Check className="w-3 h-3" />
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      className="catnotes-modal-delete"
+                      onClick={() => startEditing(note)}
+                      aria-label="Edit note"
+                      title="Edit note"
+                    >
+                      <Pencil className="w-3 h-3" />
+                    </button>
+                  )}
                   <button
                     className="catnotes-modal-delete"
                     onClick={() => handleDelete(note._id!)}
+                    disabled={editingNoteId === note._id && savingEdit}
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>

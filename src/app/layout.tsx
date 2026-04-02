@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import "./globals-v2.css";
+import "./smart-recall.css";
 import AuthProvider from "@/components/AuthProvider";
 import { GlobalErrorBoundaryV2 } from "@/components/GlobalErrorBoundaryV2";
 import { ThemeProvider } from "@/components/ThemeProvider";

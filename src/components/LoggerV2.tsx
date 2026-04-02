@@ -10,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Mic, Square, Loader2, Save, CheckCircle2 } from "lucide-react";
 import DynamicIcon from "@/components/DynamicIcon";
 import type { DashboardLog } from "@/lib/logs";
+import { SMART_RECALL_LOG_SAVED_EVENT } from "@/lib/smart-recall-types";
 
 interface LoggerV2Props {
   onLogSaved?: () => void;
@@ -77,6 +78,9 @@ export default function LoggerV2({ onLogSaved }: LoggerV2Props) {
         setShowSuccess(true);
         triggerSound(microInteractions.completionSound);
         onLogSaved?.();
+        if (typeof window !== "undefined") {
+          window.dispatchEvent(new CustomEvent(SMART_RECALL_LOG_SAVED_EVENT));
+        }
         setTimeout(() => setShowSuccess(false), 6000);
       } else {
         throw new Error(await res.text());

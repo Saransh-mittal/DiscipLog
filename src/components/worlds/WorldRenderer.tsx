@@ -30,6 +30,8 @@ import CelestialBackground from "./celestial/Background";
 import CelestialCard from "./celestial/CardSkin";
 import CelestialHeader from "./celestial/HeaderSkin";
 
+import LevelUpModal from "./LevelUpModal";
+
 /* ── Skin registry ── */
 const SKINS: Record<number, WorldSkin> = {
   0: { id: "basecamp",  name: "Basecamp",         theme: basecampTheme,  Background: BasecampBackground,  CardSkin: BasecampCard,  HeaderSkin: BasecampHeader },
@@ -121,6 +123,7 @@ export default function WorldRenderer({ children, tierOverride }: WorldRendererP
   return (
     <WorldContext.Provider value={value}>
       <Background />
+      <LevelUpModal tier={tier} theme={skin.theme} />
       {children}
     </WorldContext.Provider>
   );

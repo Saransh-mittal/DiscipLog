@@ -431,25 +431,25 @@ input[type="number"] {
    If you notice it, it's too much. Stone, not atmosphere. */
 .momentum-root[data-streak-power="4"] {
   --background: oklch(0.045 0.002 75);
-  --foreground: oklch(0.78 0.010 75);
+  --foreground: oklch(0.85 0.012 75);
   --card: oklch(0.075 0.003 72);
-  --card-foreground: oklch(0.78 0.010 75);
+  --card-foreground: oklch(0.85 0.012 75);
   --muted: oklch(0.095 0.004 72);
-  --muted-foreground: oklch(0.32 0.004 72);
-  --input: oklch(0.50 0.06 75 / 8%);
-  --border: oklch(0.50 0.06 75 / 5%);
+  --muted-foreground: oklch(0.42 0.006 72);
+  --input: oklch(0.55 0.06 75 / 12%);
+  --border: oklch(0.55 0.06 75 / 12%);
   --popover: oklch(0.075 0.003 72);
-  --popover-foreground: oklch(0.78 0.010 75);
+  --popover-foreground: oklch(0.85 0.012 75);
   --world-bg: oklch(0.045 0.002 75);
   --world-surface: oklch(0.075 0.003 72 / 98%);
   --world-surface-raised: oklch(0.095 0.004 72 / 97%);
-  --world-border: oklch(0.50 0.06 75 / 5%);
+  --world-border: oklch(0.55 0.06 75 / 18%);
   --world-border-radius: 10px;
   --world-shadow: none;
   --world-shadow-card: none;
-  --world-text-primary: oklch(0.78 0.010 75);
-  --world-text-secondary: oklch(0.50 0.006 72);
-  --world-text-muted: oklch(0.32 0.004 72);
+  --world-text-primary: oklch(0.85 0.012 75);
+  --world-text-secondary: oklch(0.62 0.008 72);
+  --world-text-muted: oklch(0.42 0.006 72);
   --world-accent: oklch(0.82 0.10 75);
   --world-accent-glow: oklch(0.82 0.10 75 / 3%);
   --world-spacing: 3.25rem;
@@ -461,13 +461,13 @@ input[type="number"] {
   --world-line-opacity: 0.2;
   --world-line-animation: none;
   --world-header-bg: oklch(0.04 0.002 72 / 99%);
-  --world-header-border: oklch(0.50 0.06 75 / 3%);
+  --world-header-border: oklch(0.55 0.06 75 / 8%);
   --world-tab-bg: transparent;
   --world-tab-border: transparent;
   --world-tab-active-bg: transparent;
-  --world-tab-active-border: oklch(0.65 0.07 75 / 6%);
-  --world-tab-text: oklch(0.32 0.004 72);
-  --world-tab-active-text: oklch(0.70 0.020 75);
+  --world-tab-active-border: oklch(0.65 0.07 75 / 12%);
+  --world-tab-text: oklch(0.42 0.006 72);
+  --world-tab-active-text: oklch(0.78 0.025 75);
 }
 
 /* ── Global Input/Textarea dark override inside world context ──
@@ -2344,23 +2344,13 @@ input[type="number"] {
   transition: all 150ms ease;
   text-transform: uppercase;
   letter-spacing: 0.06em;
+  position: relative; /* Position relative for the absolute badge */
 }
 .catnotes-card-btn:hover {
   background: var(--v2-surface-overlay);
   color: var(--v2-text-secondary);
 }
-.catnotes-card-count {
-  font-family: var(--font-body);
-  font-size: 0.5rem;
-  font-weight: 800;
-  min-width: 14px;
-  height: 14px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  padding: 0 0.2rem;
-}
+
 
 /* ── Modal backdrop ── */
 .catnotes-modal-backdrop {

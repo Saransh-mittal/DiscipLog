@@ -33,8 +33,8 @@ import {
   Sparkles,
   Square,
   TimerReset,
-  Volume2,
 } from "lucide-react";
+import { SMART_RECALL_LOG_SAVED_EVENT } from "@/lib/smart-recall-types";
 
 const SPRINT_STORAGE_KEY = "disciplog.active-sprint.v1";
 const DURATION_PRESETS = [25, 50, 90] as const;
@@ -721,6 +721,9 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
       setIsDialogOpen(false);
       resetToIdle();
       onLogSaved?.();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new CustomEvent(SMART_RECALL_LOG_SAVED_EVENT));
+      }
     } catch (error) {
       setSaveError(
         error instanceof Error

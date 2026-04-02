@@ -6,7 +6,6 @@ import {
   useMemo,
   useEffect,
   type ReactNode,
-  type CSSProperties,
 } from "react";
 import { useCategoriesContext } from "@/components/CategoriesProvider";
 import { computeMomentum, deriveMicroInteractions, type MomentumState } from "@/lib/momentum";
@@ -24,6 +23,14 @@ const EMPTY_MOMENTUM: MomentumState = {
   weeklyHours: 0,
   weeklyByCategory: {},
   streakDays: 0,
+  streakUnlockProgress: {
+    isUnlocked: false,
+    targetHours: 0,
+    currentHours: 0,
+    remainingHours: 0,
+    status: "continuing",
+    projectedStreak: 1,
+  },
   microInteractions: {
     hoverLift: false, hoverGlow: false, hoverRipple: false,
     cardEntrance: "none",
@@ -131,4 +138,3 @@ export default function MomentumProvider({
     </MomentumContext.Provider>
   );
 }
-

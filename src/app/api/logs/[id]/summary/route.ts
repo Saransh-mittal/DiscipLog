@@ -9,6 +9,12 @@ import {
   scheduleCoachEmbeddingRefreshForLog,
 } from "@/lib/coach-embeddings";
 import { generateLogSummary } from "@/lib/log-summary";
+import {
+  deleteSmartRecallCardsForLog,
+  getPendingSmartRecallEligibility,
+  scheduleSmartRecallEligibilityBackfill,
+  scheduleSmartRecallEligibilityRefresh,
+} from "@/lib/smart-recall";
 
 function getErrorMessage(error: unknown) {
   return error instanceof Error ? error.message : "Unknown retry summary error";
@@ -51,9 +57,13 @@ export async function POST(
 
     // Save back to DB
     log.aiSummary = summary;
+    log.smartRecallEligibility = getPendingSmartRecallEligibility();
     await log.save();
+    await deleteSmartRecallCardsForLog(String(log._id));
     scheduleCoachEmbeddingRefreshForLog(String(log._id));
     scheduleCoachEmbeddingBackfill(userId);
+    scheduleSmartRecallEligibilityRefresh(String(log._id));
+    scheduleSmartRecallEligibilityBackfill(userId);
 
     return NextResponse.json({ summary });
   } catch (error: unknown) {

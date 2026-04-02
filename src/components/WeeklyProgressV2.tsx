@@ -156,7 +156,7 @@ export default function WeeklyProgressV2() {
                   className={`w-full h-2 rounded-full overflow-hidden ${
                     !isOnTrack && progressShimmer ? "progress-shimmer" : ""
                   }`}
-                  style={{ background: theme.surfaceRaised }}
+                  style={{ background: `color-mix(in oklch, ${theme.accent} 10%, ${theme.surfaceRaised})` }}
                 >
                   <div
                     className="h-full rounded-full"

@@ -1,25 +1,9 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Loader2, Trophy, Target, Sparkles, Filter, ChevronLeft, Calendar, Minus, TrendingUp, TrendingDown, CheckCircle2, Circle, XCircle } from "lucide-react";
+import { useState } from "react";
+import { Loader2, Trophy, Target, Sparkles, ChevronLeft, Calendar, Minus, TrendingUp, TrendingDown, CheckCircle2, Circle, XCircle } from "lucide-react";
+import { useDebriefs, type DebriefData } from "@/components/DebriefsProvider";
 import WorldCard from "@/components/WorldCard";
-
-interface DebriefData {
-  _id: string;
-  weekStartDate: string;
-  weekEndDate: string;
-  totalHours: number;
-  totalLogs: number;
-  bestDay: { date: string; hours: number };
-  consistencyPercent: number;
-  categoryBreakdown: any[];
-  weekTitle: string;
-  coachNote: string;
-  mvpCategory: string;
-  hardestDay: string;
-  challengeForNextWeek: string;
-  commitments?: any[];
-}
 
 function formatDateRange(start: string, end: string): string {
   const s = new Date(start + "T00:00:00");
@@ -41,26 +25,10 @@ function TrendArrow({ current, previous }: { current: number; previous: number |
 }
 
 export default function DebriefArchive() {
-  const [debriefs, setDebriefs] = useState<DebriefData[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { historyDebriefs, historyLoading } = useDebriefs();
   const [selectedDebrief, setSelectedDebrief] = useState<DebriefData | null>(null);
 
-  useEffect(() => {
-    fetch("/api/debriefs/history")
-      .then(res => res.json())
-      .then(data => {
-        if (Array.isArray(data)) {
-          setDebriefs(data);
-        }
-        setLoading(false);
-      })
-      .catch(err => {
-        console.error("Failed to fetch debriefs:", err);
-        setLoading(false);
-      });
-  }, []);
-
-  if (loading) {
+  if (historyLoading) {
     return (
       <div className="flex h-[400px] w-full items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin" style={{ color: "var(--world-text-muted, var(--v2-text-muted))" }} />
@@ -68,7 +36,7 @@ export default function DebriefArchive() {
     );
   }
 
-  if (debriefs.length === 0) {
+  if (historyDebriefs.length === 0) {
     return (
       <div className="flex h-[400px] w-full flex-col items-center justify-center text-center">
         <Sparkles className="h-10 w-10 mb-4" style={{ color: "var(--world-text-muted, var(--v2-text-muted))" }} />
@@ -140,8 +108,8 @@ export default function DebriefArchive() {
                   Category Breakdown
                 </h3>
                 <div className="flex flex-col gap-3">
-                  {selectedDebrief.categoryBreakdown.map((cat: any) => {
-                    const maxCatHours = Math.max(...selectedDebrief.categoryBreakdown.map((c: any) => c.hours), 1);
+                  {selectedDebrief.categoryBreakdown.map((cat) => {
+                    const maxCatHours = Math.max(...selectedDebrief.categoryBreakdown.map((c) => c.hours), 1);
                     return (
                       <div key={cat.name} className="flex items-center gap-3">
                         <span className="w-20 text-xs font-[var(--font-body)] truncate" style={{ color: "var(--world-text-secondary, var(--v2-text-secondary))" }}>
@@ -175,7 +143,7 @@ export default function DebriefArchive() {
                   Weekly Commitments
                 </h3>
                 <div className="flex flex-col gap-2">
-                  {selectedDebrief.commitments.map((c: any) => (
+                  {selectedDebrief.commitments.map((c) => (
                     <div key={c._id} className="flex items-center gap-3 p-3 rounded-lg border transition-colors" style={{ background: "var(--world-surface-raised, var(--v2-surface-raised))", borderColor: "var(--world-border, var(--v2-border))" }}>
                       {c.status === "completed" ? (
                         <CheckCircle2 className="w-4 h-4" style={{ color: "var(--v2-sage-400)" }} />
@@ -197,7 +165,7 @@ export default function DebriefArchive() {
               <div className="flex items-start gap-4 rounded-xl border p-5" style={{ borderColor: "color-mix(in oklch, var(--world-accent) 30%, transparent)", background: "linear-gradient(135deg, color-mix(in oklch, var(--world-accent) 25%, transparent), color-mix(in oklch, var(--world-accent) 10%, transparent))" }}>
                 <Target className="mt-0.5 h-5 w-5 shrink-0" style={{ color: "var(--world-accent, var(--v2-amber-400))" }} />
                 <div>
-                  <p className="mb-1.5 text-[11px] uppercase tracking-wider font-[var(--font-display)]" style={{ color: "var(--world-accent, var(--v2-amber-400))" }}>Next Week's Challenge</p>
+                  <p className="mb-1.5 text-[11px] uppercase tracking-wider font-[var(--font-display)]" style={{ color: "var(--world-accent, var(--v2-amber-400))" }}>Next Week&apos;s Challenge</p>
                   <p className="text-[13px] leading-relaxed" style={{ color: "var(--world-text-primary, var(--v2-text-primary))" }}>{selectedDebrief.challengeForNextWeek}</p>
                 </div>
               </div>
@@ -223,7 +191,7 @@ export default function DebriefArchive() {
       </section>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {debriefs.map((debrief) => (
+        {historyDebriefs.map((debrief) => (
           <WorldCard 
             key={debrief._id} 
             className="cursor-pointer transition-transform hover:scale-[1.02]"

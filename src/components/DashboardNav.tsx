@@ -1,7 +1,8 @@
 "use client";
 
-import { createContext, useContext, useState, useEffect, useCallback, type ReactNode } from "react";
+import { createContext, useContext, useCallback, type ReactNode } from "react";
 import { usePathname, useRouter } from "next/navigation";
+import { useDebriefs } from "@/components/DebriefsProvider";
 import { useWorld } from "@/components/worlds/WorldRenderer";
 
 export type DashboardTab = "overview" | "log" | "history" | "recall" | "settings" | "archive";
@@ -53,27 +54,10 @@ function isMainTabRoute(pathname: string): boolean {
 export function TabProvider({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
-  const [activeTab, setActiveTab] = useState<DashboardTab>(() => pathToTab(pathname));
-
-  // Sync tab when pathname changes (e.g. navigating back from Settings)
-  useEffect(() => {
-    if (isMainTabRoute(pathname)) {
-      setActiveTab(pathToTab(pathname));
-    }
-  }, [pathname]);
-
-  // Sync tab if user navigates via browser back/forward
-  useEffect(() => {
-    const onPopState = () => {
-      setActiveTab(pathToTab(window.location.pathname));
-    };
-    window.addEventListener("popstate", onPopState);
-    return () => window.removeEventListener("popstate", onPopState);
-  }, []);
+  const activeTab = pathToTab(pathname);
 
   const setTab = useCallback((tab: DashboardTab) => {
     if (tab === activeTab && isMainTabRoute(window.location.pathname)) return;
-    setActiveTab(tab);
 
     // If on a different route (e.g. Settings), use Next.js router to navigate back
     if (!isMainTabRoute(window.location.pathname)) {
@@ -102,25 +86,8 @@ const BASE_TABS: { id: DashboardTab; label: string }[] = [
 export default function DashboardNav() {
   const pathname = usePathname();
   const { activeTab, setTab } = useActiveTab();
-  const [hasArchives, setHasArchives] = useState(false);
-
-  useEffect(() => {
-    fetch("/api/debriefs/history")
-      .then((res) => { if (res.ok) return res.json(); return []; })
-      .then((data) => {
-        if (Array.isArray(data) && data.length > 0) {
-          setHasArchives(true);
-        }
-      })
-      .catch((e) => console.error("Could not fetch archives status:", e));
-  }, []);
-
-  let theme;
-  try {
-    ({ theme } = useWorld());
-  } catch {
-    theme = null;
-  }
+  const { hasArchives } = useDebriefs();
+  const { theme } = useWorld();
 
   const onMainRoute = isMainTabRoute(pathname);
 

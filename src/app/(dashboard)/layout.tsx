@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
+import Image from "next/image";
+import appIcon from "@/app/icon.png";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Button } from "@/components/ui/button";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -70,12 +72,15 @@ export default async function DashboardLayout({ children }: { children: React.Re
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-6">
-                  <h2
-                    className="text-lg font-bold tracking-tight"
-                    style={{ fontFamily: "var(--font-display)", color: "var(--world-text-primary, oklch(0.82 0.008 260))" }}
-                  >
-                    Discip<span style={{ color: "var(--world-accent, oklch(0.60 0.06 260))" }}>Log</span>
-                  </h2>
+                  <div className="flex items-center">
+                    <Image src={appIcon} alt="DiscipLog Icon" width={36} height={36} className="rounded-md shadow-sm" />
+                    <h2
+                      className="text-lg font-bold tracking-tight"
+                      style={{ fontFamily: "var(--font-display)", color: "var(--world-text-primary, oklch(0.82 0.008 260))" }}
+                    >
+                      Discip<span style={{ color: "var(--world-accent, oklch(0.60 0.06 260))" }}>Log</span>
+                    </h2>
+                  </div>
 
                   <DashboardNav />
                 </div>

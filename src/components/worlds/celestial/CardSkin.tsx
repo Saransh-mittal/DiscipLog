@@ -46,7 +46,7 @@ export default function CardSkin({ children, className = "", style }: Props) {
       <div
         className="absolute inset-x-0 bottom-0 h-px"
         style={{
-          background: `linear-gradient(90deg, transparent 10%, oklch(0.60 0.08 72 / 15%) 30%, oklch(0.60 0.08 72 / 12%) 70%, transparent 90%)`,
+          background: `linear-gradient(90deg, transparent 10%, oklch(0.60 0.08 72 / 22%) 30%, oklch(0.60 0.08 72 / 18%) 70%, transparent 90%)`,
         }}
       />
       {children}

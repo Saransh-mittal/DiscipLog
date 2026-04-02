@@ -113,11 +113,22 @@ Chronological feed displaying historical work logs broken down into "All Session
 - Custom Markdown renderer for AI chat responses and log summaries.
 - Renders standard markdown elements (bold, italic, lists, code blocks) with DiscipLog-styled typography.
 
+### `SmartRecallProvider`
+- Shared client-side Smart Recall orchestrator mounted inside the world-tier shell.
+- Fetches `GET /api/recall`, keeps the queue fresh when snoozes expire, and listens for post-save log events so recall can surface directly after manual logs and sprint saves.
+- Owns the one-card-at-a-time recall session modal and the first-run tutorial modal.
+- Preserves a stable Smart Recall identity while still inheriting active world-tier surfaces, borders, motion, and spacing through `useWorld()`.
+
+### `RecallBonusCard`
+- Overview widget that turns Smart Recall into a visible bonus state inside the main productivity flow.
+- Renders the four primary states: `locked`, `ready`, `scheduled`, and `cleared`.
+- Shows unlock progress, next recall timing, or finished/empty guidance, and routes the user toward either logging more work or starting recall immediately.
+
 ### `SmartRecallFeed`
-- Semantic search interface for the "Recall" tab.
-- Takes a user query, sends to `/api/recall`, and displays ranked historical log matches.
-- Shows a polished empty state UI when no logs match.
-- Renders match relevance scores and contextual highlights.
+- Queue/history surface for the dedicated "Recall" tab.
+- Uses the shared Smart Recall provider instead of its own fetch loop.
+- Shows the current queue broken into `Ready Now`, `Coming Back`, and `Completed Today`.
+- Offers entry points for `Start Recall`, tutorial help, and manual refresh, but leaves the actual answer/check flow to the shared modal so the main experience remains one-card-at-a-time.
 
 ### `MomentumProvider` & `MomentumFlame`
 - `MomentumProvider` computes `streakPower` and `dailyEnergy` from the user's logging history, exposing these values via React context.

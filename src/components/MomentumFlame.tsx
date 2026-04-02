@@ -2,7 +2,9 @@
 
 import { useMomentum } from "@/components/MomentumProvider";
 import { useWorld } from "@/components/worlds/WorldRenderer";
-import type { DailyEnergy, StreakPower } from "@/lib/momentum";
+import type { StreakPower } from "@/lib/momentum";
+import type { WorldTheme } from "@/components/worlds/types";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 
 interface TierConfig {
   particleCount: number;
@@ -18,16 +20,80 @@ const STREAK_CONFIG: Record<StreakPower, TierConfig> = {
   4: { particleCount: 0, emoji: "👑", showGlow: false },
 };
 
-const ENERGY_SCALE: Record<DailyEnergy, number> = {
-  0: 0.4, 1: 0.55, 2: 0.7, 3: 0.8, 4: 0.9, 5: 1.0,
-};
+function formatRemainingHours(hours: number) {
+  if (hours >= 1) {
+    return `${Math.floor(hours)}h ${Math.round((hours % 1) * 60)}m`;
+  }
+
+  return `${Math.round(hours * 60)}m`;
+}
+
+function getBadgeVisuals(
+  theme: WorldTheme,
+  tier: number,
+  status: "secured" | "continuing" | "revivable"
+) {
+  const radius = tier === 2 ? "10px" : tier >= 3 ? "999px" : theme.borderRadius;
+
+  if (status === "secured") {
+    return {
+      background: `color-mix(in oklch, ${theme.accent} 14%, ${theme.surfaceRaised})`,
+      borderColor: `color-mix(in oklch, ${theme.accent} 34%, ${theme.border})`,
+      color: theme.accent,
+      boxShadow: tier === 4 ? "none" : `0 0 14px ${theme.accentGlow}`,
+      borderRadius: radius,
+    };
+  }
+
+  if (status === "revivable") {
+    return {
+      background: `color-mix(in oklch, ${theme.accent} ${tier >= 3 ? 16 : 20}%, ${theme.surfaceRaised})`,
+      borderColor: `color-mix(in oklch, ${theme.accent} ${tier >= 3 ? 36 : 44}%, ${theme.border})`,
+      color: tier === 4 ? theme.accent : theme.textPrimary,
+      boxShadow: tier === 4 ? "none" : `0 0 ${tier === 3 ? 18 : 12}px ${theme.accentGlow}`,
+      borderRadius: radius,
+    };
+  }
+
+  return {
+    background: `color-mix(in oklch, ${theme.accent} ${tier >= 3 ? 8 : 10}%, ${theme.surfaceRaised})`,
+    borderColor: `color-mix(in oklch, ${theme.accent} ${tier >= 3 ? 18 : 22}%, ${theme.border})`,
+    color: tier === 4 ? theme.textSecondary : theme.textPrimary,
+    boxShadow: "none",
+    borderRadius: radius,
+  };
+}
 
 export default function MomentumFlame() {
-  const { dailyEnergy, streakPower, streakDays, todayHours, loading } = useMomentum();
-  const { CardSkin, theme } = useWorld();
+  const { streakPower, streakDays, loading, streakUnlockProgress } = useMomentum();
+  const { CardSkin, theme, tier } = useWorld();
   const config = STREAK_CONFIG[streakPower];
-  const scale = ENERGY_SCALE[dailyEnergy];
   const hasGradient = !!theme.accentGradient && streakDays >= 3;
+  const remainingLabel = formatRemainingHours(streakUnlockProgress.remainingHours);
+  const isSecured = streakUnlockProgress.status === "secured";
+  const isRevivable = streakUnlockProgress.status === "revivable";
+  const projectedStreak = streakUnlockProgress.projectedStreak;
+  const badgeVisuals = getBadgeVisuals(theme, tier, streakUnlockProgress.status);
+
+  const badgeLabel = isSecured
+    ? "✓ Momentum Secured"
+    : isRevivable
+      ? streakDays > 0
+        ? `Revive to ${projectedStreak}d · ${remainingLabel}`
+        : `Restart streak · ${remainingLabel}`
+      : streakDays > 0
+        ? `Continue to ${projectedStreak}d · ${remainingLabel}`
+        : `Start streak · ${remainingLabel}`;
+
+  const tooltipLabel = isSecured
+    ? "Today's streak threshold is covered. Anything more you log is bonus momentum."
+    : isRevivable
+      ? streakDays > 0
+        ? `Log ${remainingLabel} today to revive your streak to ${projectedStreak} days.`
+        : `Log ${remainingLabel} today to restart with a 1-day streak.`
+      : streakDays > 0
+        ? `Log ${remainingLabel} today to continue your streak and move it to ${projectedStreak} days.`
+        : `Log ${remainingLabel} today to start your streak.`;
 
   if (loading) {
     return (
@@ -38,7 +104,7 @@ export default function MomentumFlame() {
   }
 
   return (
-    <CardSkin className="relative flex flex-col items-center justify-center" style={{ minHeight: 140 }}>
+    <CardSkin className="relative flex flex-col items-center justify-center" style={{ minHeight: 140, paddingBottom: "1.5rem" }}>
       {/* Accent glow behind emoji — NOT at tier 4 */}
       {config.showGlow && (
         <div
@@ -63,7 +129,7 @@ export default function MomentumFlame() {
                 background: theme.accent,
                 opacity: 0.3,
                 left: `${15 + (i / config.particleCount) * 70}%`,
-                bottom: `${20 + Math.random() * 40}%`,
+                bottom: `${24 + ((i * 17) % 5) * 7}%`,
                 animation: `flame-particle-rise ${1.5 + (i % 3) * 0.5}s ease-out infinite`,
                 animationDelay: `${i * 0.3}s`,
               }}
@@ -72,40 +138,70 @@ export default function MomentumFlame() {
         </div>
       )}
 
-      {/* Stats */}
-      <div className="relative z-10 text-center">
-        <p className="text-lg mb-0.5" aria-hidden="true">{config.emoji}</p>
-        <p
-          className="text-2xl font-bold tracking-tight"
-          style={{
-            fontFamily: "var(--font-display)",
-            ...(hasGradient
-              ? {
-                  background: theme.accentGradient,
-                  WebkitBackgroundClip: "text",
-                  WebkitTextFillColor: "transparent",
-                  backgroundClip: "text",
-                }
-              : {
-                  color: streakDays >= 3 ? theme.accent : theme.textPrimary,
-                }),
-            transition: `color ${streakPower === 4 ? "1200ms" : "800ms"} ease`,
-          }}
-        >
-          {streakDays}d
-        </p>
-        <p
-          className="text-xs font-semibold uppercase tracking-widest"
-          style={{ color: theme.textMuted, fontFamily: "var(--font-body)" }}
-        >
-          Streak
-        </p>
-        <p
-          className="mt-1 text-[10px] tabular-nums"
-          style={{ color: theme.textMuted, fontFamily: "var(--font-display)" }}
-        >
-          {todayHours.toFixed(2)}h today
-        </p>
+      {/* Stats & Badge Container */}
+      <div className="relative z-10 flex flex-col items-center gap-2 mt-2">
+        <div className="text-center">
+          <p className="text-lg mb-0.5" aria-hidden="true">{config.emoji}</p>
+          <p
+            className="text-2xl font-bold tracking-tight"
+            style={{
+              fontFamily: "var(--font-display)",
+              ...(hasGradient
+                ? {
+                    background: theme.accentGradient,
+                    WebkitBackgroundClip: "text",
+                    WebkitTextFillColor: "transparent",
+                    backgroundClip: "text",
+                  }
+                : {
+                    color: streakDays >= 3 ? theme.accent : theme.textPrimary,
+                  }),
+              transition: `color ${streakPower === 4 ? "1200ms" : "800ms"} ease`,
+            }}
+          >
+            {streakDays}d
+          </p>
+          <p
+            className="text-xs font-semibold uppercase tracking-widest leading-none mt-1"
+            style={{ color: theme.textMuted, fontFamily: "var(--font-body)" }}
+          >
+            Streak
+          </p>
+        </div>
+
+        {/* Streak progress badge */}
+        {streakUnlockProgress && (
+          <TooltipProvider>
+            <Tooltip delayDuration={0}>
+              <TooltipTrigger asChild>
+                <button
+                  className="px-2.5 py-1 border flex items-center justify-center transition-colors duration-500 hover:opacity-80 cursor-pointer focus:outline-none focus:ring-2 focus:ring-offset-2"
+                  style={{
+                    background: badgeVisuals.background,
+                    borderColor: badgeVisuals.borderColor,
+                    borderRadius: badgeVisuals.borderRadius,
+                    backdropFilter: "blur(4px)",
+                    boxShadow: badgeVisuals.boxShadow,
+                  }}
+                >
+                  <span
+                    className="text-[10px] font-semibold tracking-wide"
+                    style={{
+                      color: badgeVisuals.color,
+                      fontFamily: "var(--font-body)",
+                      letterSpacing: tier === 2 ? "0.09em" : undefined,
+                    }}
+                  >
+                    {badgeLabel}
+                  </span>
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom" className="max-w-[200px] text-center p-3">
+                <p>{tooltipLabel}</p>
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+        )}
       </div>
 
       <style>{`

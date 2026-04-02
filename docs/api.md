@@ -17,6 +17,8 @@
   - `implicitMemory`: AI-inferred behavioral patterns (≤500 chars).
   - `implicitMemoryUpdatedAt`, `implicitMemoryLastEvaluatedLogAt`, `implicitMemoryLastEvaluatedChatAt`: Timestamps for memory cooldown logic.
   - `implicitMemoryPending`: Boolean lock flag for optimistic concurrency control.
+- `smartRecall`: Embedded subdocument for Smart Recall UX state.
+  - `tutorialSeenAt`: Timestamp set only after the user finishes the first-run Smart Recall tutorial.
 - `usagePattern`: Embedded subdocument for nudge timing. Contains `avgLogHour`, `dayOfWeekAvgHour` (7-element array), `sampleSize`, `lastCalculatedAt`, `inferredTimezone`.
 - `createdAt`: ISO timestamp.
 
@@ -37,7 +39,7 @@
 - `category`: User-defined string (must match an existing item in the user's `categories` array).
 - `rawTranscript`: Stored exact web-speech logged content.
 - `aiSummary`: Post-processed analysis text ready for display.
-- `coachEmbedding`: Optional `number[]` vector embedding for Smart Recall semantic search.
+- `coachEmbedding`: Optional `number[]` vector embedding for AI Coach historical retrieval and related semantic search helpers.
 - `embeddingModel`: Optional string identifying the embedding model used (e.g. `text-embedding-3-small`).
 - `embeddingDimensions`: Optional integer for vector dimensionality.
 - `embeddingUpdatedAt`: Optional timestamp for when the embedding was last generated.
@@ -51,6 +53,22 @@
 - `createdAt`: ISO timestamp of exact persistence time.
 
 *Indexing:* `userId + date + category` (compound for calendar view), `userId + embeddingUpdatedAt` (for embedding background jobs).
+
+### SmartRecallCard
+- Persists the Smart Recall queue so the feature can live in the main workflow rather than being a stateless daily deck.
+- `userId`: Associates the recall card to a specific user.
+- `sourceLogId`: Reference to the single `LogEntry` this card was generated from in v1.
+- `title`, `prompt`, `answer`, `why`: The active-recall payload shown in the UI.
+- `category`, `sourceDate`: Snapshot metadata copied from the source log for display.
+- `rarity`: One of `"spark"`, `"forge"`, or `"boss"`.
+- `status`: One of `"due"`, `"snoozed"`, or `"completed"`.
+- `dueAt`: Timestamp controlling when the card is eligible to reappear.
+- `completedAt`: Timestamp set only after the user explicitly hits `Got it`.
+- `lastViewedAt`: Most recent interaction timestamp for recall-card lifecycle tracking.
+- `snoozeCount`: Number of times the user has hit `Need again` on that card.
+- `createdAt` / `updatedAt`: Standard persistence timestamps.
+
+*Indexing:* unique `userId + sourceLogId`, plus `userId + status + dueAt` for queue retrieval and `userId + completedAt` for completed-today views.
 
 ### Nudge
 - Tracks proactive system-generated nudge notifications.
@@ -162,11 +180,33 @@ Supports two payload shapes:
 - **After stream:** Fires `scheduleImplicitMemoryRefreshFromChat()` non-blocking via `queueMicrotask`.
 - Requires `OPENAI_API_KEY` on the server.
 
-### `POST /api/recall`
-**Body:** `{ query }`
-- Smart Recall endpoint. Performs semantic search across all user logs using vector embeddings.
-- Falls back through Atlas vector search → app-side cosine similarity → keyword/category matching.
-- Returns ranked, relevant historical log entries for display in the Smart Recall feed.
+### `GET /api/recall`
+**Query:** `?timezone=Asia/Kolkata`
+- Returns the Smart Recall queue summary for the current user.
+- If the user has at least 3 logs, the server auto-generates recall cards for uncovered eligible logs and promotes any expired snoozes back to `"due"`.
+- Returns a workflow-oriented payload including:
+  - `state`: `"locked" | "ready" | "scheduled" | "cleared"`
+  - `pendingCount`, `dueCount`, `completedTodayCount`
+  - `nextDueAt`
+  - `tutorialSeen`
+  - `activeCard`
+  - `logsUntilUnlock`
+  - `unlockProgress`
+  - `queue.due`, `queue.snoozed`, `queue.completedToday`
+
+### `POST /api/recall/[id]/complete`
+- Marks a specific Smart Recall card as `"completed"`.
+- Also stamps `completedAt` and `lastViewedAt`.
+- Returns the refreshed Smart Recall summary so the client can immediately continue to the next due card or collapse back to a cleared/scheduled state.
+
+### `POST /api/recall/[id]/snooze`
+- Marks a specific Smart Recall card as `"snoozed"`.
+- Moves `dueAt` forward by 1 hour and increments `snoozeCount`.
+- Returns the refreshed Smart Recall summary.
+
+### `POST /api/recall/tutorial/seen`
+- Marks the Smart Recall tutorial as completed for the current user by setting `User.smartRecall.tutorialSeenAt`.
+- Used after the user finishes the first-run walkthrough.
 
 ### `POST /api/errors`
 **Body:** `{ message, stack?, userContext? }`

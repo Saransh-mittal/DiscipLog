@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
-import { generateDailyRecallFeed } from "@/lib/proactive-insights";
+import { getSmartRecallSummary } from "@/lib/smart-recall";
 
 export async function GET(req: Request) {
   const session = await getServerSession(authOptions);
@@ -14,10 +14,10 @@ export async function GET(req: Request) {
   const { searchParams } = new URL(req.url);
   const timezone = searchParams.get("timezone");
 
-  const feed = await generateDailyRecallFeed({
+  const summary = await getSmartRecallSummary({
     userId,
     timezone,
   });
 
-  return NextResponse.json(feed);
+  return NextResponse.json(summary);
 }

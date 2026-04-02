@@ -16,6 +16,11 @@ import {
   scheduleCoachEmbeddingRefreshForLog,
 } from "@/lib/coach-embeddings";
 import { scheduleImplicitMemoryRefreshFromLog } from "@/lib/implicit-memory";
+import {
+  getPendingSmartRecallEligibility,
+  scheduleSmartRecallEligibilityBackfill,
+  scheduleSmartRecallEligibilityRefresh,
+} from "@/lib/smart-recall";
 import { scheduleUsagePatternRecalc } from "@/lib/usage-patterns";
 
 function parsePositiveNumber(value: unknown): number | null {
@@ -70,6 +75,7 @@ export async function POST(req: Request) {
       rawTranscript: rawTranscript.trim(),
       aiSummary: typeof summary === "string" ? summary.trim() : undefined,
       source,
+      smartRecallEligibility: getPendingSmartRecallEligibility(),
     };
 
     let logInstant: Date;
@@ -128,6 +134,8 @@ export async function POST(req: Request) {
     scheduleCoachEmbeddingRefreshForLog(String(log._id));
     scheduleCoachEmbeddingBackfill(userId);
     scheduleImplicitMemoryRefreshFromLog(userId);
+    scheduleSmartRecallEligibilityRefresh(String(log._id));
+    scheduleSmartRecallEligibilityBackfill(userId);
     scheduleUsagePatternRecalc(userId, resolvedTimezone);
 
     return response;

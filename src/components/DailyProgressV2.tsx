@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { Badge } from "@/components/ui/badge";
 import { Archive, StickyNote } from "lucide-react";
 import { useCategoriesContext } from "@/components/CategoriesProvider";
@@ -8,11 +8,9 @@ import DynamicIcon from "@/components/DynamicIcon";
 import { useMomentum } from "@/components/MomentumProvider";
 import { useWorld } from "@/components/worlds/WorldRenderer";
 import CategoryNotesModal from "@/components/CategoryNotesModal";
-import type { UserCategory } from "@/lib/logs";
 
 export default function DailyProgressV2() {
-  const { categories: rawCategories, loading: catLoading, refreshCategories } = useCategoriesContext();
-  const categories = rawCategories || [];
+  const { categories, loading: catLoading } = useCategoriesContext();
   const {
     todayByCategory,
     todayHours,
@@ -23,7 +21,13 @@ export default function DailyProgressV2() {
   } = useMomentum();
   const { CardSkin, theme } = useWorld();
   const isLoading = catLoading || momentumLoading;
-  const [notesCategory, setNotesCategory] = useState<UserCategory | null>(null);
+  const [notesCategoryId, setNotesCategoryId] = useState<string | null>(null);
+  const notesCategory = useMemo(
+    () =>
+      categories.find((category) => String(category._id) === notesCategoryId) ??
+      null,
+    [categories, notesCategoryId]
+  );
 
   const { completionPulse, progressShimmer } = microInteractions;
 
@@ -89,7 +93,7 @@ export default function DailyProgressV2() {
               return (
                 <div
                   key={cat.name}
-                  className={`rounded-xl p-4 border transition-all duration-500 ${
+                  className={`relative rounded-xl p-4 border transition-all duration-500 ${
                     isDone && completionPulse ? "completion-pulse" : ""
                   }`}
                   style={{
@@ -98,6 +102,8 @@ export default function DailyProgressV2() {
                     borderRadius: theme.borderRadius,
                   }}
                 >
+
+
                   {/* Icon + label */}
                   <div className="flex items-center gap-2 mb-3">
                     <DynamicIcon
@@ -143,7 +149,7 @@ export default function DailyProgressV2() {
                     className={`w-full h-1.5 rounded-full overflow-hidden ${
                       !isDone && progressShimmer ? "progress-shimmer" : ""
                     }`}
-                    style={{ background: theme.surfaceRaised }}
+                    style={{ background: `color-mix(in oklch, ${theme.accent} 10%, ${theme.surfaceRaised})` }}
                   >
                     <div
                       className="h-full rounded-full"
@@ -189,8 +195,8 @@ export default function DailyProgressV2() {
 
                   {/* Next Steps button */}
                   <button
-                    className="catnotes-card-btn"
-                    onClick={() => setNotesCategory(cat)}
+                    className="catnotes-card-btn relative"
+                    onClick={() => setNotesCategoryId(String(cat._id))}
                     style={{
                       borderColor: `${theme.accent}20`,
                     }}
@@ -198,15 +204,16 @@ export default function DailyProgressV2() {
                     <StickyNote className="w-3 h-3" style={{ color: theme.accent }} />
                     <span>Notes</span>
                     {(cat.notes?.filter((n) => !n.done).length ?? 0) > 0 && (
-                      <span
-                        className="catnotes-card-count"
+                      <div
+                        className="absolute -top-2 -right-2 flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-black shadow-md z-10"
                         style={{
-                          background: `${theme.accent}20`,
-                          color: theme.accent,
+                          background: 'var(--v2-amber-400)',
+                          color: 'var(--v2-obsidian-900)',
+                          fontFamily: "var(--font-display)",
                         }}
                       >
                         {cat.notes!.filter((n) => !n.done).length}
-                      </span>
+                      </div>
                     )}
                   </button>
                 </div>
@@ -273,7 +280,7 @@ export default function DailyProgressV2() {
         <CategoryNotesModal
           category={notesCategory}
           theme={theme}
-          onClose={() => setNotesCategory(null)}
+          onClose={() => setNotesCategoryId(null)}
         />
       )}
     </>

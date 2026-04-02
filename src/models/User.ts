@@ -31,6 +31,9 @@ export interface IUser extends Document {
   image?: string;
   categories: IUserCategory[];
   aiProfile: StoredAIProfile;
+  smartRecall?: {
+    tutorialSeenAt: Date | null;
+  };
   usagePattern: {
     avgLogHour: number | null;
     dayOfWeekAvgHour: (number | null)[];
@@ -84,6 +87,13 @@ const AIProfileSchema = new Schema(
   { _id: false }
 );
 
+const SmartRecallSchema = new Schema(
+  {
+    tutorialSeenAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const UserSchema: Schema = new Schema({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
@@ -99,6 +109,10 @@ const UserSchema: Schema = new Schema({
   },
   aiProfile: {
     type: AIProfileSchema,
+    default: () => ({}),
+  },
+  smartRecall: {
+    type: SmartRecallSchema,
     default: () => ({}),
   },
   usagePattern: {

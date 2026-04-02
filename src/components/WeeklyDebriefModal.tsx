@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import { useDebriefs, type DebriefData } from "@/components/DebriefsProvider";
 import {
   X,
   Trophy,
@@ -12,30 +13,6 @@ import {
   Sparkles,
   ArrowRight,
 } from "lucide-react";
-
-interface CategoryBreakdown {
-  name: string;
-  hours: number;
-  logCount: number;
-  targetHit: boolean;
-  prevWeekHours: number | null;
-}
-
-interface DebriefData {
-  _id: string;
-  weekStartDate: string;
-  weekEndDate: string;
-  totalHours: number;
-  totalLogs: number;
-  bestDay: { date: string; hours: number };
-  consistencyPercent: number;
-  categoryBreakdown: CategoryBreakdown[];
-  weekTitle: string;
-  coachNote: string;
-  mvpCategory: string;
-  hardestDay: string;
-  challengeForNextWeek: string;
-}
 
 function formatDateRange(start: string, end: string): string {
   const s = new Date(start + "T00:00:00");
@@ -62,43 +39,36 @@ function TrendArrow({ current, previous }: { current: number; previous: number |
 }
 
 export default function WeeklyDebriefModal() {
+  const { latestDebrief, acknowledgeDebrief } = useDebriefs();
   const [debrief, setDebrief] = useState<DebriefData | null>(null);
   const [isVisible, setIsVisible] = useState(false);
   const [isAcknowledging, setIsAcknowledging] = useState(false);
 
   useEffect(() => {
-    const fetchDebrief = async () => {
-      try {
-        const res = await fetch("/api/debriefs/latest");
-        if (!res.ok) return;
-        const data = await res.json();
-        if (data && data._id) {
-          setDebrief(data);
-          requestAnimationFrame(() => {
-            requestAnimationFrame(() => setIsVisible(true));
-          });
-        }
-      } catch {
-        // Silently fail
-      }
-    };
+    if (!latestDebrief) return;
 
-    fetchDebrief();
-  }, []);
+    setDebrief((current) => (current?._id === latestDebrief._id ? current : latestDebrief));
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => setIsVisible(true));
+    });
+  }, [latestDebrief]);
 
   const handleAcknowledge = useCallback(async () => {
     if (!debrief || isAcknowledging) return;
     setIsAcknowledging(true);
 
     try {
-      await fetch(`/api/debriefs/${debrief._id}/acknowledge`, { method: "PATCH" });
+      await acknowledgeDebrief(debrief._id);
+      setIsVisible(false);
+      setTimeout(() => {
+        setDebrief((current) => (current?._id === debrief._id ? null : current));
+      }, 600);
     } catch {
       // Best effort
+    } finally {
+      setIsAcknowledging(false);
     }
-
-    setIsVisible(false);
-    setTimeout(() => setDebrief(null), 600);
-  }, [debrief, isAcknowledging]);
+  }, [acknowledgeDebrief, debrief, isAcknowledging]);
 
   if (!debrief) return null;
 

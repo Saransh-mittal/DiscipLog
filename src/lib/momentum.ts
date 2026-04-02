@@ -50,6 +50,15 @@ export interface MicroInteractions {
   badgeFloat: BadgeFloat;            // none → subtle → gentle → calm → still
 }
 
+export interface StreakUnlockProgress {
+  isUnlocked: boolean;
+  targetHours: number;
+  currentHours: number;
+  remainingHours: number;
+  status: "secured" | "continuing" | "revivable";
+  projectedStreak: number;
+}
+
 export interface MomentumState {
   /* Visual levels */
   dailyEnergy: DailyEnergy;
@@ -65,6 +74,7 @@ export interface MomentumState {
   weeklyHours: number;
   weeklyByCategory: Record<string, number>;
   streakDays: number;
+  streakUnlockProgress: StreakUnlockProgress;
 
   /* Sub-tier micro-interactions — SSOT */
   microInteractions: MicroInteractions;
@@ -127,32 +137,83 @@ function deriveDailyEnergy(
   return 1;
 }
 
-function computeStreak(logs: DashboardLog[]): number {
+function computeStreak(
+  logs: DashboardLog[],
+  categories: UserCategory[]
+): {
+  streak: number;
+  streakUnlockProgress: StreakUnlockProgress;
+} {
   const dailyTotals: Record<string, number> = {};
   for (const log of logs) {
     dailyTotals[log.date] = (dailyTotals[log.date] || 0) + log.hours;
   }
 
-  let streak = 0;
-  const date = new Date();
-  const todayStr = formatLocalDate(date);
-
-  // If today has no meaningful work, start counting from yesterday
-  if (!dailyTotals[todayStr] || dailyTotals[todayStr] < 1) {
-    date.setDate(date.getDate() - 1);
+  const activeCategories = categories.filter((c) => !c.isSideCategory);
+  let totalTargetHours = 0;
+  for (const cat of activeCategories) {
+    totalTargetHours += cat.dailyTargetHours;
   }
+  const unlockThreshold = totalTargetHours > 0 ? totalTargetHours * 0.2 : 0.01;
 
-  while (true) {
-    const dateStr = formatLocalDate(date);
-    if (dailyTotals[dateStr] && dailyTotals[dateStr] >= 1) {
-      streak++;
-      date.setDate(date.getDate() - 1);
-    } else {
-      break;
+  const today = new Date();
+  const todayStr = formatLocalDate(today);
+  const todayHours = dailyTotals[todayStr] || 0;
+
+  const isUnlocked = todayHours >= unlockThreshold;
+  const remainingHours = Math.max(0, unlockThreshold - todayHours);
+  const [ty, tm, td] = todayStr.split("-").map(Number);
+  const yesterday = new Date(ty, tm - 1, td - 1, 12, 0, 0);
+  const yesterdayStr = formatLocalDate(yesterday);
+  const qualifiedYesterday = (dailyTotals[yesterdayStr] || 0) >= 0.01;
+
+  let streak = 0;
+
+  if (logs.length > 0) {
+    const firstDateStr = logs.reduce((min, log) => log.date < min ? log.date : min, logs[0].date);
+    
+    // Parse safely to avoid timezone leaps
+    const [fy, fm, fd] = firstDateStr.split("-").map(Number);
+    const iterDate = new Date(fy, fm - 1, fd, 12, 0, 0);
+    const endDate = new Date(ty, tm - 1, td, 12, 0, 0);
+
+    while (iterDate <= endDate) {
+      const dStr = formatLocalDate(iterDate);
+      const hours = dailyTotals[dStr] || 0;
+
+      // For historical logs, any logged work (> 0) counts. 20% threshold is strictly for today.
+      const requiredHours = (dStr >= todayStr) ? unlockThreshold : 0.01;
+
+      if (hours >= requiredHours) {
+        streak++;
+      } else {
+        if (dStr !== todayStr) {
+          streak = Math.max(0, streak - 2);
+        }
+      }
+
+      iterDate.setDate(iterDate.getDate() + 1);
     }
   }
 
-  return streak;
+  const status: StreakUnlockProgress["status"] = isUnlocked
+    ? "secured"
+    : logs.length > 0 && !qualifiedYesterday
+      ? "revivable"
+      : "continuing";
+  const projectedStreak = isUnlocked ? streak : streak + 1;
+
+  return {
+    streak,
+    streakUnlockProgress: {
+      isUnlocked,
+      targetHours: unlockThreshold,
+      currentHours: todayHours,
+      remainingHours,
+      status,
+      projectedStreak,
+    }
+  };
 }
 
 function deriveStreakPower(streakDays: number): StreakPower {
@@ -256,7 +317,7 @@ export function computeMomentum(
     categories
   );
 
-  const streakDays = computeStreak(logs);
+  const { streak: streakDays, streakUnlockProgress } = computeStreak(logs, categories);
   const dailyEnergy = deriveDailyEnergy(todayTargetPercent, todayLogCount);
   const streakPower = deriveStreakPower(streakDays);
   const microInteractions = deriveMicroInteractions(dailyEnergy, streakPower, streakDays);
@@ -273,6 +334,7 @@ export function computeMomentum(
     weeklyHours,
     weeklyByCategory,
     streakDays,
+    streakUnlockProgress,
     microInteractions,
   };
 }

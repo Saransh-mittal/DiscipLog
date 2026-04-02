@@ -93,7 +93,15 @@ src/app/
     ├── commitments/
     │   └── route.ts        ← GET/POST/PATCH /api/commitments
     ├── recall/
-    │   └── route.ts        ← POST /api/recall (Smart Recall vector search)
+    │   ├── route.ts        ← GET /api/recall (Smart Recall queue summary)
+    │   ├── [id]/
+    │   │   ├── complete/
+    │   │   │   └── route.ts ← POST /api/recall/[id]/complete
+    │   │   └── snooze/
+    │   │       └── route.ts ← POST /api/recall/[id]/snooze
+    │   └── tutorial/
+    │       └── seen/
+    │           └── route.ts ← POST /api/recall/tutorial/seen
     ├── errors/
     │   └── route.ts        ← POST /api/errors (GlobalErrorBoundary sink)
     ├── push/
@@ -418,9 +426,11 @@ src/lib/
 ├── ai-profile.ts         ← Types + parsers for the AI coach profile (persona, memory)
 ├── implicit-memory.ts    ← Background AI memory evaluation engine with optimistic locking
 ├── coach-context.ts      ← Baseline context builder, query signals, historical retrieval, stats
-├── coach-embeddings.ts   ← Vector embedding generation (text-embedding-3-small) for Smart Recall
+├── coach-embeddings.ts   ← Vector embedding generation (text-embedding-3-small) for AI Coach retrieval
 ├── log-summary.ts        ← Shared OpenAI summarization prompt helper
 ├── momentum.ts           ← Streak power + daily energy computation for Momentum system
+├── smart-recall-types.ts ← Shared Smart Recall enums + response types
+├── smart-recall.ts       ← Smart Recall queue generation + lifecycle orchestration
 ├── push-service.ts       ← VAPID-authenticated Web Push notification dispatch
 ├── usage-patterns.ts     ← Rolling average logging-time analysis for smart nudge timing
 ├── proactive-insights.ts ← Contextual intelligence for nudge and debrief generation

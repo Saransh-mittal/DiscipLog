@@ -7,7 +7,9 @@ import WorldRenderer from "@/components/worlds/WorldRenderer";
 import SoundManager from "@/components/SoundManager";
 import CompletionCelebration from "@/components/CompletionCelebration";
 import WeeklyDebriefModal from "@/components/WeeklyDebriefModal";
+import { DebriefsProvider } from "@/components/DebriefsProvider";
 import { TabProvider } from "@/components/DashboardNav";
+import SmartRecallProvider from "@/components/SmartRecallProvider";
 
 // Suppress known React DevTools instrumentation error (not an app bug)
 // https://github.com/facebook/react/issues/24119
@@ -37,6 +39,7 @@ function usePreloadComponents() {
       import("@/components/MomentumFlame");
       import("@/components/AIAssistantV2");
       import("@/components/SmartRecallFeed");
+      import("@/components/RecallBonusCard");
       import("@/components/EndOfDayMicroReview");
     }, 1000);
     return () => clearTimeout(timer);
@@ -49,14 +52,18 @@ function MomentumShell({ children }: { children: ReactNode }) {
   usePreloadComponents();
 
   return (
-    <MomentumProvider logs={logs} loading={loading}>
-      <WorldRenderer>
-        {children}
-        <SoundManager />
-        <CompletionCelebration />
-        <WeeklyDebriefModal />
-      </WorldRenderer>
-    </MomentumProvider>
+    <DebriefsProvider>
+      <MomentumProvider logs={logs} loading={loading}>
+        <WorldRenderer>
+          <SmartRecallProvider>
+            {children}
+            <SoundManager />
+            <CompletionCelebration />
+            <WeeklyDebriefModal />
+          </SmartRecallProvider>
+        </WorldRenderer>
+      </MomentumProvider>
+    </DebriefsProvider>
   );
 }
 

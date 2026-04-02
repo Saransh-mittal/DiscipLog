@@ -1,11 +1,11 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { Card } from "@/components/ui/card";
+import { useEffect, useMemo, useState } from "react";
 import { Clock, TrendingUp } from "lucide-react";
 import { useMomentum } from "@/components/MomentumProvider";
 import { useLogs } from "@/components/LogsProvider";
 import { useActiveTab, type DashboardTab } from "@/components/DashboardNav";
+import { useWorld } from "@/components/worlds/WorldRenderer";
 import CalendarV2 from "@/components/CalendarV2";
 import WeeklyProgressV2 from "@/components/WeeklyProgressV2";
 import AIAssistantV2 from "@/components/AIAssistantV2";
@@ -19,8 +19,70 @@ import SettingsPage from "@/components/SettingsPage";
 import SmartRecallFeed from "@/components/SmartRecallFeed";
 import EndOfDayMicroReview from "@/components/EndOfDayMicroReview";
 import DebriefArchive from "@/components/DebriefArchive";
+import RecallBonusCard from "@/components/RecallBonusCard";
 
 const ALL_TABS: DashboardTab[] = ["overview", "log", "history", "recall", "settings", "archive"];
+
+/** Stat cards that get the same CardSkin treatment as MomentumFlame */
+function StatCards() {
+  const { todayHours, weeklyHours, loading: momentumLoading } = useMomentum();
+  const { CardSkin, theme } = useWorld();
+  const isLoading = momentumLoading;
+
+  const stats = [
+    { label: "Today", value: `${todayHours.toFixed(2)}h`, icon: Clock, accent: todayHours >= 4 },
+    { label: "This Week", value: `${weeklyHours.toFixed(2)}h`, icon: TrendingUp, accent: weeklyHours >= 20 },
+  ];
+
+  return (
+    <>
+      {stats.map((stat) => (
+        <CardSkin
+          key={stat.label}
+          className="flex items-center gap-4"
+          style={{ padding: "1rem 1.25rem" }}
+        >
+          <div
+            className="rounded-xl p-2.5"
+            style={{
+              background: stat.accent
+                ? `color-mix(in oklch, ${theme.accent} 12%, transparent)`
+                : theme.surfaceRaised,
+            }}
+          >
+            <stat.icon
+              className="h-5 w-5"
+              style={{
+                color: stat.accent
+                  ? theme.accent
+                  : theme.textMuted,
+              }}
+            />
+          </div>
+          <div>
+            <p
+              className="mb-0.5 text-xs font-semibold uppercase tracking-widest"
+              style={{ color: theme.textMuted }}
+            >
+              {stat.label}
+            </p>
+            <p
+              className="text-2xl font-bold tracking-tight"
+              style={{
+                fontFamily: "var(--font-display)",
+                color: stat.accent
+                  ? theme.accent
+                  : theme.textPrimary,
+              }}
+            >
+              {isLoading ? "—" : stat.value}
+            </p>
+          </div>
+        </CardSkin>
+      ))}
+    </>
+  );
+}
 
 /**
  * Progressive tab mounting strategy:
@@ -32,37 +94,24 @@ const ALL_TABS: DashboardTab[] = ["overview", "log", "history", "recall", "setti
  */
 export default function DashboardTabPage() {
   const { activeTab } = useActiveTab();
-  const { todayHours, weeklyHours, loading: momentumLoading } = useMomentum();
+  const { loading: momentumLoading } = useMomentum();
   const { logs, loading, refreshLogs } = useLogs();
-  const isLoading = loading || momentumLoading;
 
-  // Track which tabs have been mounted
-  const [mountedTabs, setMountedTabs] = useState<Set<DashboardTab>>(
-    () => new Set([activeTab])
-  );
-
-  // When user clicks a tab, mount it immediately
-  useEffect(() => {
-    setMountedTabs((prev) => {
-      if (prev.has(activeTab)) return prev;
-      const next = new Set(prev);
-      next.add(activeTab);
-      return next;
-    });
-  }, [activeTab]);
+  const [backgroundTabsMounted, setBackgroundTabsMounted] = useState(false);
 
   // After initial paint, mount remaining tabs in background
   useEffect(() => {
     const id = setTimeout(() => {
-      setMountedTabs(new Set(ALL_TABS));
+      setBackgroundTabsMounted(true);
     }, 50);
     return () => clearTimeout(id);
   }, []);
 
-  const stats = [
-    { label: "Today", value: `${todayHours.toFixed(2)}h`, icon: Clock, accent: todayHours >= 4 },
-    { label: "This Week", value: `${weeklyHours.toFixed(2)}h`, icon: TrendingUp, accent: weeklyHours >= 20 },
-  ];
+  const mountedTabs = useMemo(
+    () =>
+      backgroundTabsMounted ? new Set(ALL_TABS) : new Set<DashboardTab>([activeTab]),
+    [activeTab, backgroundTabsMounted]
+  );
 
   return (
     <>
@@ -88,53 +137,14 @@ export default function DashboardTabPage() {
               </p>
             </section>
 
-            <div className="grid grid-cols-3 gap-4">
-              {stats.map((stat) => (
-                <Card
-                  key={stat.label}
-                  className="world-card relative flex items-center gap-4 overflow-hidden border p-4 md:p-5"
-                >
-                  <div
-                    className="rounded-xl p-2.5"
-                    style={{
-                      background: stat.accent
-                        ? "oklch(0.65 0.19 60 / 10%)"
-                        : "var(--world-surface-raised, var(--v2-surface-raised))",
-                    }}
-                  >
-                    <stat.icon
-                      className="h-5 w-5"
-                      style={{
-                        color: stat.accent
-                          ? "var(--world-accent, var(--v2-amber-400))"
-                          : "var(--world-text-muted, var(--v2-text-muted))",
-                      }}
-                    />
-                  </div>
-                  <div>
-                    <p
-                      className="mb-0.5 text-xs font-semibold uppercase tracking-widest"
-                      style={{ color: "var(--world-text-muted, var(--v2-text-muted))" }}
-                    >
-                      {stat.label}
-                    </p>
-                    <p
-                      className="text-2xl font-bold tracking-tight"
-                      style={{
-                        fontFamily: "var(--font-display)",
-                        color: stat.accent
-                          ? "var(--world-accent, var(--v2-amber-400))"
-                          : "var(--world-text-primary, var(--v2-text-primary))",
-                      }}
-                    >
-                      {isLoading ? "—" : stat.value}
-                    </p>
-                  </div>
-                </Card>
-              ))}
-
+            {/* Stats Row — Today, This Week, Streak */}
+            <div className="grid gap-4 md:grid-cols-3">
+              <StatCards />
               <MomentumFlame />
             </div>
+
+            {/* Recall Bonus — full width, premium accent line */}
+            <RecallBonusCard />
 
             <DailyProgressV2 />
             <CommitmentTracker />

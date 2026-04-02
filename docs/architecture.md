@@ -1,7 +1,7 @@
 # DiscipLog Architecture
 
 ## Overview
-DiscipLog is a robust discipline-logging application designed to be scalable, responsive, and seamless across platforms, relying on artificial intelligence to contextualize time spent. The V2 dashboard is a multi-page application (Overview, Log, History, Settings) that supports direct manual logs, in-app eggtimer-style sprint sessions, post-save log management (edit, regenerate summary, and delete), weekly commitment tracking, AI-powered Smart Recall (vector search), a Momentum/World-tier gamification system, proactive Web Push nudges, and cinematic Weekly Debriefs. All flows converge into the same persisted log model, utilizing AI-facilitated user onboarding and fully dynamic, user-defined categories.
+DiscipLog is a robust discipline-logging application designed to be scalable, responsive, and seamless across platforms, relying on artificial intelligence to contextualize time spent. The V2 dashboard is a multi-page application (Overview, Log, History, Settings) that supports direct manual logs, in-app eggtimer-style sprint sessions, post-save log management (edit, regenerate summary, and delete), weekly commitment tracking, a persisted Smart Recall bonus queue, a Momentum/World-tier gamification system, proactive Web Push nudges, and cinematic Weekly Debriefs. All flows converge into the same persisted log model, utilizing AI-facilitated user onboarding and fully dynamic, user-defined categories.
 
 ## Core Stack
 - **Framework:** Next.js 16 (App Router) + TypeScript
@@ -63,6 +63,15 @@ DiscipLog transitions from a passive listener into an active companion:
 ## Momentum / World-Tier Gamification
 The `MomentumProvider` computes streak power and daily energy metrics, feeding into the `WorldRenderer` which selects an active world skin and injects `--world-*` CSS custom properties on `:root`. Each world tier applies distinct colors, micro-interactions, and card skins via `WorldCard` and the `useMomentumClasses` hook.
 
+## Smart Recall Architecture
+Smart Recall is no longer a stateless "daily deck" destination. It is a persisted queue that lives inside the main productivity flow:
+
+1. **Unlocking:** The feature stays locked until the user has logged at least 3 real sessions.
+2. **Coverage:** The server generates one Smart Recall card per uncovered eligible log and stores it in `SmartRecallCard`, tying each card to a single `sourceLogId`.
+3. **Queue States:** Cards move through `due`, `snoozed`, and `completed`, allowing the app to show `ready`, `scheduled`, `cleared`, and `locked` states on the Overview bonus widget.
+4. **Workflow Integration:** The shared Smart Recall provider listens for log-save events and can auto-open the next due card after manual logs or sprint saves.
+5. **Tier-Synced UX:** The recall bonus card, tutorial, and recall session all inherit the active world tier's surfaces, borders, spacing, and motion so the feature feels native to the current momentum skin rather than bolted on.
+
 ## Documentation Structure
 - `docs/components.md` - Tracks the purpose of shared atomic elements.
 - `docs/api.md` - Schema design and routing.
@@ -86,8 +95,10 @@ The `MomentumProvider` computes streak power and daily energy metrics, feeding i
 - `src/lib/ai-profile.ts` — persona types, AI profile parsing, and the `getStoredAIProfile()` defensive parser.
 - `src/lib/implicit-memory.ts` — background AI memory evaluation engine with optimistic locking.
 - `src/lib/coach-context.ts` — baseline context builder, query signal classifier, historical log retrieval, and stats computation for the AI Coach.
-- `src/lib/coach-embeddings.ts` — vector embedding generation and management for Smart Recall.
+- `src/lib/coach-embeddings.ts` — vector embedding generation and management for AI Coach historical retrieval.
 - `src/lib/momentum.ts` — streak power and daily energy computation for the Momentum system.
+- `src/lib/smart-recall-types.ts` — shared Smart Recall enums and wire types used by both client and server.
+- `src/lib/smart-recall.ts` — Smart Recall queue generation, lifecycle transitions, unlock logic, and API summary shaping.
 - `src/lib/push-service.ts` — VAPID-authenticated Web Push notification dispatch.
 - `src/lib/usage-patterns.ts` — rolling average logging-time analysis for smart nudge timing.
 - `src/lib/proactive-insights.ts` — contextual intelligence for nudge and debrief generation.
