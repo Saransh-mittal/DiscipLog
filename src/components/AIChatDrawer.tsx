@@ -706,6 +706,7 @@ export default function AIChatDrawer({
   const lastAssistantIsStreaming = isStreaming && lastMsg?.role === "assistant";
   const lastAssistantText = lastMsg ? getMessageText(lastMsg) : "";
   const lastAssistantToolData = lastMsg ? getToolCallDataFromMessage(lastMsg) : [];
+  const lastAssistantReasoning = lastMsg && isPro ? getReasoningText(lastMsg) : "";
 
   // ── Resolve theme vars ──
   // Coach uses hardcoded dark theme, recall will inherit from CSS custom properties
@@ -1091,9 +1092,10 @@ export default function AIChatDrawer({
               );
             })}
 
-            {/* Thinking indicator */}
+            {/* Thinking indicator — suppressed when the last message bubble already shows an inline loader */}
             {(isSubmitted ||
-              (lastAssistantIsStreaming && !lastAssistantText && lastAssistantToolData.length === 0)) && (
+              (lastAssistantIsStreaming && !lastAssistantText && lastAssistantToolData.length === 0)) &&
+              !(lastMsg?.role === "assistant" && (lastAssistantToolData.length > 0 || Boolean(lastAssistantReasoning))) && (
               <div className="dcl-msg flex items-start gap-2.5 justify-start">
                 <div
                   className="shrink-0 mt-1 p-1.5 rounded-lg"
