@@ -1,9 +1,15 @@
+import type { Metadata } from "next";
 import { getServerSession } from "next-auth";
 import { authOptions } from "@/app/api/auth/[...nextauth]/route";
 import { redirect } from "next/navigation";
 import connectToDatabase from "@/lib/mongoose";
 import User from "@/models/User";
 import OnboardingFlow from "@/components/OnboardingFlow";
+
+export const metadata: Metadata = {
+  title: "Get Started",
+  robots: "noindex, nofollow",
+};
 
 export default async function OnboardingPage() {
   const session = await getServerSession(authOptions);

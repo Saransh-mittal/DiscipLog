@@ -144,7 +144,7 @@ function playCompletionTone() {
 
   const AudioContextCtor =
     window.AudioContext ||
-    // @ts-expect-error webkit prefix is not included in lib dom types
+    // @ts-ignore webkit prefix may not be in lib dom types
     window.webkitAudioContext;
 
   if (!AudioContextCtor) {

@@ -11,6 +11,7 @@
   "dependencies": {
     "@ai-sdk/openai": "^3.0.41",
     "@ai-sdk/react": "^3.0.118",
+    "@next/third-parties": "^16.2.2",
     "@upstash/ratelimit": "^2.0.8",
     "@upstash/redis": "^1.37.0",
     "ai": "^6.0.116",
