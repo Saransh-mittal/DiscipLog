@@ -16,6 +16,7 @@ import {
 import DynamicIcon from "@/components/DynamicIcon";
 import type { CategoryNote, UserCategory } from "@/lib/logs";
 import { useCategoriesContext } from "@/components/CategoriesProvider";
+import TextareaAutosize from "react-textarea-autosize";
 
 interface CategoryNotesModalProps {
   category: UserCategory;
@@ -41,7 +42,7 @@ export default function CategoryNotesModal({
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingValue, setEditingValue] = useState("");
   const [savingEdit, setSavingEdit] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const backdropRef = useRef<HTMLDivElement>(null);
   const { updateCategory, refreshCategories } = useCategoriesContext();
 
@@ -284,7 +285,7 @@ export default function CategoryNotesModal({
               {sortedNotes.map((note) => (
                 <div
                   key={note._id}
-                  className={`catnotes-modal-item ${note.done ? "done" : ""}`}
+                  className={`catnotes-modal-item ${note.done ? "done" : ""} ${editingNoteId === note._id ? "editing" : ""}`}
                 >
                   <button
                     className="catnotes-checkbox"
@@ -303,18 +304,22 @@ export default function CategoryNotesModal({
                     )}
                   </button>
                   {editingNoteId === note._id ? (
-                    <input
+                    <TextareaAutosize
                       value={editingValue}
                       onChange={(e) => setEditingValue(e.target.value)}
                       onKeyDown={(e) => {
-                        if (e.key === "Enter") {
+                        if (e.key === "Enter" && !e.shiftKey) {
+                          e.preventDefault();
                           void handleSaveEdit(note._id!);
                         }
                         if (e.key === "Escape") {
                           cancelEditing();
                         }
                       }}
-                      className="catnotes-modal-input flex-1 min-w-0"
+                      minRows={1}
+                      maxRows={5}
+                      className="catnotes-modal-input flex-1 min-w-0 custom-scrollbar"
+                      style={{ resize: "none", overflowY: "auto" }}
                       disabled={savingEdit}
                     />
                   ) : (
@@ -333,9 +338,9 @@ export default function CategoryNotesModal({
                       title="Save note"
                     >
                       {savingEdit ? (
-                        <Loader2 className="w-3 h-3 animate-spin" />
+                        <Loader2 className="w-4 h-4 animate-spin" />
                       ) : (
-                        <Check className="w-3 h-3" />
+                        <Check className="w-4 h-4" />
                       )}
                     </button>
                   ) : (
@@ -345,7 +350,7 @@ export default function CategoryNotesModal({
                       aria-label="Edit note"
                       title="Edit note"
                     >
-                      <Pencil className="w-3 h-3" />
+                      <Pencil className="w-4 h-4" />
                     </button>
                   )}
                   <button
@@ -353,7 +358,7 @@ export default function CategoryNotesModal({
                     onClick={() => handleDelete(note._id!)}
                     disabled={editingNoteId === note._id && savingEdit}
                   >
-                    <Trash2 className="w-3 h-3" />
+                    <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               ))}
@@ -363,13 +368,21 @@ export default function CategoryNotesModal({
 
         {/* Add Input */}
         <div className="catnotes-modal-footer">
-          <input
+          <TextareaAutosize
             ref={inputRef}
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAdd()}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && !e.shiftKey) {
+                e.preventDefault();
+                handleAdd();
+              }
+            }}
+            minRows={1}
+            maxRows={5}
             placeholder="Add a next step…"
-            className="catnotes-modal-input"
+            className="catnotes-modal-input custom-scrollbar"
+            style={{ resize: "none", overflowY: "auto" }}
             disabled={adding}
           />
           <button

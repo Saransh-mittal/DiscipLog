@@ -99,16 +99,18 @@ export default function LoggerV2({ onLogSaved }: LoggerV2Props) {
         <Textarea
           value={transcript}
           onChange={(e) => setTranscript(e.target.value)}
+          minRows={3}
+          maxRows={8}
           placeholder={
             supported
               ? "What did you work on? Type or tap mic to dictate…"
               : "What did you work on?"
           }
-          className="quicklog-textarea"
+          className="quicklog-textarea custom-scrollbar"
           style={{
             borderColor: isListening
               ? "var(--world-accent, var(--v2-amber-400))"
-              : "var(--v2-border)",
+              : "var(--world-border, var(--v2-border))",
             boxShadow: isListening
               ? "0 0 20px color-mix(in oklch, var(--world-accent, var(--v2-amber-500)) 15%, transparent)"
               : "none",
@@ -191,13 +193,13 @@ export default function LoggerV2({ onLogSaved }: LoggerV2Props) {
                 style={{
                   borderColor: isListening
                     ? "var(--world-accent, var(--v2-amber-400))"
-                    : "var(--v2-border-strong)",
+                    : "var(--world-border, var(--v2-border-strong))",
                   background: isListening
                     ? "color-mix(in oklch, var(--world-accent, var(--v2-amber-500)) 12%, transparent)"
-                    : "var(--v2-obsidian-700)",
+                    : "var(--world-surface-raised, var(--v2-obsidian-700))",
                   color: isListening
                     ? "var(--world-accent, var(--v2-amber-300))"
-                    : "var(--v2-text-secondary)",
+                    : "var(--world-text-secondary, var(--v2-text-secondary))",
                 }}
               >
                 {isListening ? (

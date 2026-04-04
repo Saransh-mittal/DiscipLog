@@ -54,6 +54,7 @@ interface RecallCardRecord {
   completedAt?: Date | string | null;
   lastViewedAt?: Date | string | null;
   snoozeCount?: number | null;
+  drawerMessageCount?: number | null;
   createdAt?: Date | string | null;
 }
 
@@ -292,6 +293,7 @@ function toCardView(card: RecallCardRecord): SmartRecallCardView {
     completedAt: parseMaybeDate(card.completedAt)?.toISOString() ?? null,
     lastViewedAt: parseMaybeDate(card.lastViewedAt)?.toISOString() ?? null,
     snoozeCount: card.snoozeCount ?? 0,
+    drawerMessageCount: card.drawerMessageCount ?? 0,
   };
 }
 
@@ -396,6 +398,10 @@ Rules:
 - For dense logs, make the recall prompt correspondingly deeper. Ask about the full idea, approach, key decision, and outcome, not just a single isolated detail.
 - Answers should feel complete. Cover the main understanding from the log in 2-5 crisp sentences, including the approach, important detail, and outcome when present.
 - If the log spans multiple important points, synthesize them into one cohesive answer instead of a one-line fragment.
+- Format both the 'prompt' and 'answer' fields using rich Markdown styling.
+- Use a Markdown heading (###) to structure the overarching idea when it heavily clarifies the content.
+- VERY IMPORTANT: You MUST insert blank newlines (\\n\\n) before and after any lists, bullet points, or code blocks so that they render correctly in strict markdown parsers. Do not write list items inline without line breaks.
+- Use bolding (**text**) for emphasis, true bullet points (starting on new lines) for rules or sequences, and \`code blocks\` or \`\`\`blocks\`\`\` for any technical details, patterns, or formulas.
 - "why" should explain why recalling this matters right now.
 - Keep the tone sharp, useful, and lightly game-like, not cheesy.`,
       prompt: `Timezone: ${input.timezone}
@@ -502,6 +508,7 @@ async function ensureRecallCoverage(userId: string, timezone: string) {
                 completedAt: null,
                 lastViewedAt: null,
                 snoozeCount: 0,
+                drawerMessageCount: 0,
               },
             },
             upsert: true,
@@ -626,6 +633,42 @@ async function buildSmartRecallSummary(
 
   const userState = await loadRecallUserState(userId);
   const { totalLogs } = await ensureRecallCoverage(userId, timezone);
+
+  if (totalLogs < SMART_RECALL_UNLOCK_LOGS) {
+    return {
+      state: "locked",
+      pendingCount: 0,
+      dueCount: 0,
+      completedTodayCount: 0,
+      nextDueAt: null,
+      tutorialSeen: userState.tutorialSeen,
+      activeCard: null,
+      logsUntilUnlock: SMART_RECALL_UNLOCK_LOGS - totalLogs,
+      unlockProgress: {
+        currentLogs: totalLogs,
+        requiredLogs: SMART_RECALL_UNLOCK_LOGS,
+      },
+      queue: {
+        due: [],
+        snoozed: [],
+        completedToday: [],
+      },
+    };
+  }
+
+  return buildSmartRecallSummaryLightweight(userId, timezone);
+}
+
+/**
+ * Lightweight variant that skips coverage generation and pruning.
+ * Use this after card actions (snooze/complete) where new card generation is unnecessary.
+ */
+async function buildSmartRecallSummaryLightweight(
+  userId: string,
+  timezone: string
+): Promise<SmartRecallSummary> {
+  const userState = await loadRecallUserState(userId);
+  const totalLogs = await LogEntry.countDocuments({ userId });
 
   if (totalLogs < SMART_RECALL_UNLOCK_LOGS) {
     return {
@@ -856,7 +899,7 @@ export async function completeSmartRecallCard(input: {
     return null;
   }
 
-  return buildSmartRecallSummary(
+  return buildSmartRecallSummaryLightweight(
     input.userId,
     getResolvedTimezone(input.timezone)
   );
@@ -869,7 +912,9 @@ export async function snoozeSmartRecallCard(input: {
 }): Promise<SmartRecallSummary | null> {
   await connectToDatabase();
 
-  const updated = await SmartRecallCard.findOneAndUpdate(
+  // Get the card state BEFORE the update so we can read drawerMessageCount
+  // without an extra query — returnDocument: "before" gives us the pre-update doc.
+  const before = await SmartRecallCard.findOneAndUpdate(
     { _id: input.cardId, userId: input.userId },
     {
       $set: {
@@ -881,14 +926,23 @@ export async function snoozeSmartRecallCard(input: {
         snoozeCount: 1,
       },
     },
-    { returnDocument: "after" }
-  ).lean();
+    { returnDocument: "before" }
+  ).lean<RecallCardRecord & { drawerMessageCount?: number }>();
 
-  if (!updated) {
+  if (!before) {
     return null;
   }
 
-  return buildSmartRecallSummary(
+  // If the user struggled (lots of drawer messages), shorten the snooze window
+  if (before.drawerMessageCount && before.drawerMessageCount > 3) {
+    const shorterDueAt = new Date(Date.now() + Math.floor(SMART_RECALL_SNOOZE_MS / 2));
+    await SmartRecallCard.updateOne(
+      { _id: input.cardId },
+      { $set: { dueAt: shorterDueAt } }
+    );
+  }
+
+  return buildSmartRecallSummaryLightweight(
     input.userId,
     getResolvedTimezone(input.timezone)
   );

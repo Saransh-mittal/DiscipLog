@@ -30,6 +30,17 @@ export default function RecallBonusCard() {
 
   const state = summary?.state ?? "locked";
 
+  // Hide entirely while loading or when there are truly zero recalls
+  // (cleared queue with nothing pending = nothing to show on overview)
+  const hasNoRecalls =
+    state === "cleared" &&
+    (summary?.pendingCount ?? 0) === 0 &&
+    (summary?.dueCount ?? 0) === 0 &&
+    (summary?.completedTodayCount ?? 0) === 0;
+  if (loading || hasNoRecalls) {
+    return null;
+  }
+
   const statusCopy =
     state === "ready"
       ? {

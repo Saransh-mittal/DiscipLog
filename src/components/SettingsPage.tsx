@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "next-auth/react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -306,7 +307,7 @@ export default function SettingsPage() {
             <h3 className="settings-section-title">Categories</h3>
             <p
               style={{
-                color: "var(--v2-text-muted)",
+                color: "var(--world-text-muted, var(--v2-text-muted))",
                 fontSize: "0.8125rem",
                 marginTop: "0.25rem",
                 fontWeight: 500,
@@ -409,7 +410,7 @@ export default function SettingsPage() {
                   onClick={() => setPendingAction({ type: "archive", index: i })}
                   className="settings-cat-delete"
                   title="Archive category"
-                  style={{ color: "var(--v2-text-muted)" }}
+                  style={{ color: "var(--world-text-muted, var(--v2-text-muted))" }}
                 >
                   <Archive className="w-3.5 h-3.5" />
                 </button>
@@ -523,7 +524,7 @@ export default function SettingsPage() {
                     <div className="settings-cat-info" style={{ flex: 1 }}>
                       <span
                         style={{
-                          color: "var(--v2-text-muted)",
+                          color: "var(--world-text-muted, var(--v2-text-muted))",
                           fontSize: "0.875rem",
                           fontWeight: 600,
                           fontFamily: "var(--font-body)",
@@ -565,9 +566,9 @@ export default function SettingsPage() {
             <div
               onClick={(e) => e.stopPropagation()}
               style={{
-                background: "var(--v2-surface-card, oklch(0.16 0.01 260))",
-                border: "1px solid var(--v2-border, oklch(1 0 0 / 8%))",
-                borderRadius: "16px",
+                background: "var(--world-surface, var(--v2-surface-card, oklch(0.16 0.01 260)))",
+                border: "1px solid var(--world-border, var(--v2-border, oklch(1 0 0 / 8%)))",
+                borderRadius: "var(--world-border-radius, 16px)",
                 padding: "1.5rem",
                 maxWidth: "380px",
                 width: "90vw",
@@ -576,7 +577,7 @@ export default function SettingsPage() {
               {/* Header */}
               <div style={{ display: "flex", alignItems: "center", gap: "0.5rem", marginBottom: "0.75rem" }}>
                 {pendingAction.type === "archive" ? (
-                  <Archive className="w-4.5 h-4.5" style={{ color: "var(--v2-text-muted)" }} />
+                  <Archive className="w-4.5 h-4.5" style={{ color: "var(--world-text-muted, var(--v2-text-muted))" }} />
                 ) : (
                   <Trash2 className="w-4.5 h-4.5" style={{ color: "oklch(0.65 0.18 18)" }} />
                 )}
@@ -585,7 +586,7 @@ export default function SettingsPage() {
                     fontFamily: "var(--font-display)",
                     fontSize: "1rem",
                     fontWeight: 800,
-                    color: "var(--v2-text-primary)",
+                    color: "var(--world-text-primary, var(--v2-text-primary))",
                     margin: 0,
                   }}
                 >
@@ -616,21 +617,21 @@ export default function SettingsPage() {
                 style={{
                   fontFamily: "var(--font-body)",
                   fontSize: "0.8125rem",
-                  color: "var(--v2-text-secondary)",
+                  color: "var(--world-text-secondary, var(--v2-text-secondary))",
                   lineHeight: 1.6,
                   margin: "0 0 1.25rem 0",
                 }}
               >
                 {pendingAction.type === "archive" ? (
                   <>
-                    <strong style={{ color: "var(--v2-text-primary)" }}>
+                    <strong style={{ color: "var(--world-text-primary, var(--v2-text-primary))" }}>
                       {localCategories[pendingAction.index]?.name || "this category"}
                     </strong>{" "}
                     will be hidden from your dashboard and logger. Any hours already logged will appear as &ldquo;Archived&rdquo; on your overview. You can restore it anytime.
                   </>
                 ) : (
                   <>
-                    <strong style={{ color: "var(--v2-text-primary)" }}>
+                    <strong style={{ color: "var(--world-text-primary, var(--v2-text-primary))" }}>
                       {localCategories[pendingAction.index]?.name || "this category"}
                     </strong>{" "}
                     will be permanently removed. Your existing logs won&rsquo;t be deleted, but the category definition will be gone forever. This cannot be undone.
@@ -650,9 +651,9 @@ export default function SettingsPage() {
                     height: "2.25rem",
                     padding: "0 1rem",
                     borderRadius: "10px",
-                    border: "1px solid var(--v2-border, oklch(1 0 0 / 10%))",
-                    background: "var(--v2-surface-raised, oklch(0.18 0.01 260))",
-                    color: "var(--v2-text-secondary, oklch(0.7 0.02 260))",
+                    border: "1px solid var(--world-border, var(--v2-border, oklch(1 0 0 / 10%)))",
+                    background: "var(--world-surface-raised, var(--v2-surface-raised, oklch(0.18 0.01 260)))",
+                    color: "var(--world-text-secondary, var(--v2-text-secondary, oklch(0.7 0.02 260)))",
                     fontSize: "0.8125rem",
                     fontWeight: 600,
                     fontFamily: "var(--font-body)",
@@ -680,13 +681,13 @@ export default function SettingsPage() {
                     borderRadius: "10px",
                     border: pendingAction.type === "delete"
                       ? "1px solid oklch(0.60 0.20 18 / 40%)"
-                      : "1px solid var(--v2-border, oklch(1 0 0 / 10%))",
+                      : "1px solid var(--world-border, var(--v2-border, oklch(1 0 0 / 10%)))",
                     background: pendingAction.type === "delete"
                       ? "linear-gradient(135deg, oklch(0.50 0.20 18), oklch(0.40 0.18 18))"
-                      : "var(--v2-surface-raised, oklch(0.18 0.01 260))",
+                      : "var(--world-surface-raised, var(--v2-surface-raised, oklch(0.18 0.01 260)))",
                     color: pendingAction.type === "delete"
                       ? "#fff"
-                      : "var(--v2-text-primary, oklch(0.9 0.01 260))",
+                      : "var(--world-text-primary, var(--v2-text-primary, oklch(0.9 0.01 260)))",
                     fontSize: "0.8125rem",
                     fontWeight: 700,
                     fontFamily: "var(--font-body)",
@@ -820,12 +821,183 @@ export default function SettingsPage() {
                 </p>
               )}
             </div>
+
+            {/* Model Preference (Pro only) */}
+            <ModelPreferenceSection />
           </>
         )}
       </div>
 
       {/* ─── Notifications Section ─── */}
       <NotificationsSection />
+    </div>
+  );
+}
+
+function ModelPreferenceSection() {
+  const { data: session } = useSession();
+  const plan = (session?.user as any)?.plan || "free";
+  const isPro = plan === "pro";
+
+  const [selectedModel, setSelectedModel] = useState("gpt-5-mini");
+  const [saving, setSaving] = useState(false);
+  const [modelLoaded, setModelLoaded] = useState(false);
+
+  // Load current preference
+  useEffect(() => {
+    if (!isPro) return;
+    const loadModel = async () => {
+      try {
+        const res = await fetch("/api/users/profile");
+        if (res.ok) {
+          const data = await res.json();
+          // We'll read it from the user's subscription if available
+        }
+      } catch {}
+      setModelLoaded(true);
+    };
+    loadModel();
+  }, [isPro]);
+
+  const handleModelChange = async (model: string) => {
+    setSelectedModel(model);
+    setSaving(true);
+    try {
+      await fetch("/api/settings/model", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ preferredModel: model }),
+      });
+    } catch {}
+    setSaving(false);
+  };
+
+  const MODEL_OPTIONS = [
+    {
+      value: "gpt-5-mini",
+      label: "GPT-5 Mini",
+      description: "Fast, efficient responses for most coaching tasks",
+    },
+    {
+      value: "gpt-5",
+      label: "GPT-5",
+      description: "Most capable model for deep analysis and complex questions",
+    },
+  ];
+
+  return (
+    <div className="settings-memory-box" style={{ marginTop: "1rem" }}>
+      <h4 className="settings-memory-title" style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+        AI Model
+        {isPro ? (
+          <span
+            style={{
+              fontSize: "0.625rem",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              color: "oklch(0.72 0.16 145)",
+              background: "oklch(0.72 0.16 145 / 12%)",
+              border: "1px solid oklch(0.72 0.16 145 / 25%)",
+              borderRadius: "6px",
+              padding: "0.125rem 0.5rem",
+              fontFamily: "var(--font-body)",
+            }}
+          >
+            Pro
+          </span>
+        ) : (
+          <span
+            style={{
+              fontSize: "0.625rem",
+              fontWeight: 700,
+              textTransform: "uppercase",
+              letterSpacing: "0.08em",
+              color: "var(--v2-text-muted)",
+              background: "oklch(1 0 0 / 5%)",
+              border: "1px solid oklch(1 0 0 / 8%)",
+              borderRadius: "6px",
+              padding: "0.125rem 0.5rem",
+              fontFamily: "var(--font-body)",
+            }}
+          >
+            Free
+          </span>
+        )}
+      </h4>
+
+      {isPro ? (
+        <div style={{ display: "flex", flexDirection: "column", gap: "0.5rem", marginTop: "0.5rem" }}>
+          {MODEL_OPTIONS.map((opt) => (
+            <button
+              key={opt.value}
+              onClick={() => handleModelChange(opt.value)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: "0.75rem",
+                padding: "0.625rem 0.75rem",
+                borderRadius: "10px",
+                border: selectedModel === opt.value
+                  ? "1px solid oklch(0.72 0.16 145 / 35%)"
+                  : "1px solid oklch(1 0 0 / 8%)",
+                background: selectedModel === opt.value
+                  ? "oklch(0.72 0.16 145 / 8%)"
+                  : "transparent",
+                cursor: "pointer",
+                transition: "all 150ms ease",
+                textAlign: "left",
+              }}
+            >
+              <div
+                style={{
+                  width: "14px",
+                  height: "14px",
+                  borderRadius: "50%",
+                  border: selectedModel === opt.value
+                    ? "4px solid oklch(0.72 0.16 145)"
+                    : "2px solid oklch(1 0 0 / 20%)",
+                  flexShrink: 0,
+                  transition: "all 150ms ease",
+                }}
+              />
+              <div>
+                <p
+                  style={{
+                    fontSize: "0.8125rem",
+                    fontWeight: 700,
+                    color: selectedModel === opt.value ? "oklch(0.72 0.16 145)" : "var(--v2-text-primary)",
+                    margin: 0,
+                    fontFamily: "var(--font-display)",
+                  }}
+                >
+                  {opt.label}
+                </p>
+                <p
+                  style={{
+                    fontSize: "0.6875rem",
+                    color: "var(--v2-text-muted)",
+                    margin: 0,
+                    fontFamily: "var(--font-body)",
+                  }}
+                >
+                  {opt.description}
+                </p>
+              </div>
+            </button>
+          ))}
+          {saving && (
+            <p style={{ fontSize: "0.6875rem", color: "var(--v2-text-muted)", margin: "0.25rem 0 0 0" }}>
+              Saving…
+            </p>
+          )}
+        </div>
+      ) : (
+        <p className="settings-memory-text" style={{ marginTop: "0.375rem" }}>
+          Using <strong style={{ color: "var(--v2-text-primary)" }}>GPT-5 Nano</strong>{" "}
+          — fast and lightweight for everyday coaching.
+        </p>
+      )}
     </div>
   );
 }

@@ -1,17 +1,13 @@
-import { NextResponse } from "next/server";
-import { getServerSession } from "next-auth";
-import {
-  convertToModelMessages,
-  smoothStream,
-  stepCountIs,
-  streamText,
-  tool,
-  type UIMessage,
-} from "ai";
-import { openai } from "@ai-sdk/openai";
+/**
+ * ai-chat-context.ts
+ *
+ * Single Source of Truth for building chat system prompts.
+ * Extracts shared helpers and mode-specific prompt builders
+ * from the old /api/chat and /api/recall/chat routes.
+ */
+
+import { tool, type UIMessage } from "ai";
 import { z } from "zod";
-import { authOptions } from "../auth/[...nextauth]/route";
-import { getPersonaOption, getPersonaPromptInstructions } from "@/lib/ai-profile";
 import {
   buildCoachQuerySignals,
   getBaselineCoachContext,
@@ -23,13 +19,26 @@ import {
   type HistoricalSearchResult,
 } from "@/lib/coach-context";
 import { getZonedDateContext, type UserCategory } from "@/lib/logs";
-import { scheduleImplicitMemoryRefreshFromChat } from "@/lib/implicit-memory";
+import {
+  getPersonaOption,
+  getPersonaPromptInstructions,
+} from "@/lib/ai-profile";
 import connectToDatabase from "@/lib/mongoose";
-import ErrorLog from "@/models/ErrorLog";
+import SmartRecallCard from "@/models/SmartRecallCard";
+import LogEntry, { type ILogEntry } from "@/models/LogEntry";
+import {
+  COACH_EMBEDDING_VERSION,
+  COACH_EMBEDDING_DIMENSIONS,
+  createCoachEmbedding,
+} from "@/lib/coach-embeddings";
+import { cosineSimilarity } from "ai";
+
+// ── Shared Helpers ──────────────────────────────────────────
 
 const DATE_KEY_RE = /^\d{4}-\d{2}-\d{2}$/;
+const MAX_CHAT_TURNS_IN_PROMPT = 4;
 
-function getMessageText(message: UIMessage): string {
+export function getMessageText(message: UIMessage): string {
   return (
     message.parts
       ?.filter((part) => part.type === "text")
@@ -39,13 +48,19 @@ function getMessageText(message: UIMessage): string {
   );
 }
 
+export function truncateText(value: string, maxChars: number): string {
+  return value.replace(/\s+/g, " ").trim().slice(0, maxChars);
+}
+
 function formatHours(hours: number): string {
   return `${Math.round(hours * 100) / 100}h`;
 }
 
-function truncateText(value: string, maxChars: number): string {
-  return value.replace(/\s+/g, " ").trim().slice(0, maxChars);
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === "object";
 }
+
+// ── Coach-Specific Helpers ──────────────────────────────────
 
 function formatLogEntries(logs: CoachContextLog[], timezone: string): string {
   if (logs.length === 0) {
@@ -57,11 +72,11 @@ function formatLogEntries(logs: CoachContextLog[], timezone: string): string {
       const timestamp = log.loggedAt || log.createdAt;
       const localTime = timestamp
         ? new Intl.DateTimeFormat("en-US", {
-          timeZone: timezone,
-          hour: "2-digit",
-          minute: "2-digit",
-          hour12: true,
-        }).format(new Date(timestamp))
+            timeZone: timezone,
+            hour: "2-digit",
+            minute: "2-digit",
+            hour12: true,
+          }).format(new Date(timestamp))
         : "unknown time";
       const summary = truncateText(
         log.aiSummary || log.rawTranscript || "No summary available.",
@@ -131,63 +146,6 @@ function formatCommitments(
         }`
     )
     .join("\n");
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return value !== null && typeof value === "object";
-}
-
-function buildToolOutputPreview(output: unknown): Record<string, unknown> | unknown {
-  if (!isRecord(output)) {
-    return output;
-  }
-
-  if (typeof output.resultSummary === "string") {
-    return {
-      resultSummary: output.resultSummary,
-      retrievalMode:
-        typeof output.retrievalMode === "string" ? output.retrievalMode : undefined,
-      resolvedCategories:
-        Array.isArray(output.resolvedCategories) ? output.resolvedCategories : [],
-      dateCoverage: isRecord(output.dateCoverage) ? output.dateCoverage : undefined,
-    };
-  }
-
-  if (Array.isArray(output.matches)) {
-    return {
-      retrievalMode:
-        typeof output.retrievalMode === "string" ? output.retrievalMode : undefined,
-      matchCount: output.matches.length,
-      resolvedCategories:
-        Array.isArray(output.resolvedCategories) ? output.resolvedCategories : [],
-    };
-  }
-
-  if (isRecord(output.overview)) {
-    return {
-      label: typeof output.label === "string" ? output.label : undefined,
-      matchedLogs:
-        typeof output.overview.matchedLogs === "number"
-          ? output.overview.matchedLogs
-          : undefined,
-      matchedHours:
-        typeof output.overview.matchedHours === "number"
-          ? output.overview.matchedHours
-          : undefined,
-      resolvedCategories:
-        Array.isArray(output.resolvedCategories) ? output.resolvedCategories : [],
-    };
-  }
-
-  return output;
-}
-
-function getErrorText(error: unknown): string {
-  if (error instanceof Error) {
-    return error.message;
-  }
-
-  return String(error);
 }
 
 function serializeHistoricalToolResult(
@@ -281,18 +239,20 @@ function serializeStatsToolResult(result: CoachStatsResult): Record<string, unkn
   };
 }
 
-interface BuildSystemPromptResult {
+// ── Coach System Prompt Builder ─────────────────────────────
+
+export interface CoachPromptResult {
   systemPrompt: string;
   latestUserText: string;
   baselineContext: BaselineCoachContext;
   signals: ReturnType<typeof buildCoachQuerySignals>;
 }
 
-async function buildSystemPrompt(input: {
+export async function buildCoachSystemPrompt(input: {
   timezone: string;
   userId: string;
   messages: UIMessage[];
-}): Promise<BuildSystemPromptResult> {
+}): Promise<CoachPromptResult> {
   const now = new Date();
   const localNow = getZonedDateContext(now, input.timezone);
   const latestUserMessage =
@@ -364,7 +324,7 @@ Use tools only if the user explicitly asks for deeper history or exact counts th
     "Format your responses using markdown: use **bold** for emphasis, bullet lists (- item) for action items and key points, and headers (##) for sections when the response has multiple topics. Keep formatting light for short answers — a single sentence needs no markdown.",
   ];
 
-  const systemPrompt = `You are DiscipLog AI — a personalized productivity coach for a software engineer.
+  const systemPrompt = `You are DiscipLog AI — a personalized productivity coach.
 You already have baseline context for recent work, weekly targets, commitments, and stable memory.
 Use tools only when the question needs deeper history or exact counts/timelines.
 
@@ -423,7 +383,6 @@ User local time context:
 Rules:
 ${rules.map((rule) => `- ${rule}`).join("\n")}`;
 
-
   return {
     systemPrompt,
     latestUserText,
@@ -432,144 +391,231 @@ ${rules.map((rule) => `- ${rule}`).join("\n")}`;
   };
 }
 
-export async function POST(req: Request) {
-  try {
-    const session = await getServerSession(authOptions);
-    if (!session?.user) {
-      return new NextResponse("Unauthorized", { status: 401 });
-    }
+/**
+ * Build the coach-mode tools object for streamText.
+ */
+export function buildCoachTools(
+  userId: string,
+  baselineContext: BaselineCoachContext,
+  recentLogIds: string[]
+) {
+  return {
+    searchHistoricalLogs: tool({
+      description:
+        "Search older logs semantically for journeys, topic coverage, struggles, breakthroughs, and lessons learned. Returns compact log summaries with scores.",
+      inputSchema: z.object({
+        query: z.string().min(2).max(240),
+        categories: z.array(z.string().min(1)).max(4).optional(),
+        limit: z.number().int().min(1).max(8).optional(),
+      }),
+      execute: async ({ query, categories, limit }) => {
+        const searchResult = await searchHistoricalLogs({
+          userId,
+          query,
+          categories,
+          limit,
+          excludeLogIds: recentLogIds,
+          availableCategories: baselineContext.userCategories,
+        });
 
-    const userId = (session.user as { id: string }).id;
-    const { messages = [], timezone } = await req.json();
-    const userTimezone = timezone || "Asia/Kolkata";
-    const typedMessages = messages as UIMessage[];
-    const promptContext = await buildSystemPrompt({
-      timezone: userTimezone,
-      userId,
-      messages: typedMessages,
-    });
-    const modelMessages = await convertToModelMessages(typedMessages);
-    const recentLogIds = promptContext.baselineContext.recentLogs.map((log) => log.id);
-    const toolNamesUsed = new Set<string>();
-    const toolNamesErrored = new Set<string>();
-
-    const result = streamText({
-      model: openai("gpt-5-nano"),
-      system: promptContext.systemPrompt,
-      messages: modelMessages,
-      toolChoice: "auto",
-      stopWhen: stepCountIs(4),
-      tools: {
-        searchHistoricalLogs: tool({
-          description:
-            "Search older logs semantically for journeys, topic coverage, struggles, breakthroughs, and lessons learned. Returns compact log summaries with scores.",
-          inputSchema: z.object({
-            query: z.string().min(2).max(240),
-            categories: z.array(z.string().min(1)).max(4).optional(),
-            limit: z.number().int().min(1).max(8).optional(),
-          }),
-          execute: async ({ query, categories, limit }) => {
-            const searchResult = await searchHistoricalLogs({
-              userId,
-              query,
-              categories,
-              limit,
-              excludeLogIds: recentLogIds,
-              availableCategories: promptContext.baselineContext.userCategories,
-            });
-
-            return serializeHistoricalToolResult(searchResult);
-          },
-        }),
-        getCoachStats: tool({
-          description:
-            "Get deterministic matching-log stats, date ranges, category totals, and a few recent examples. Use for counts, comparisons, and timelines.",
-          inputSchema: z.object({
-            query: z.string().min(1).max(240).optional(),
-            categories: z.array(z.string().min(1)).max(4).optional(),
-            range: z
-              .object({
-                startDate: z.string().regex(DATE_KEY_RE).optional(),
-                endDate: z.string().regex(DATE_KEY_RE).optional(),
-              })
-              .optional(),
-            includeExamples: z.boolean().optional(),
-          }),
-          execute: async ({ query, categories, range, includeExamples }) => {
-            const statsResult = await getCoachStats({
-              userId,
-              query,
-              categories,
-              range,
-              includeExamples,
-              availableCategories: promptContext.baselineContext.userCategories,
-            });
-
-            return serializeStatsToolResult(statsResult);
-          },
-        }),
+        return serializeHistoricalToolResult(searchResult);
       },
-      experimental_transform: smoothStream(),
-      experimental_onToolCallStart: ({ toolCall }) => {
-        toolNamesUsed.add(toolCall.toolName);
+    }),
+    getCoachStats: tool({
+      description:
+        "Get deterministic matching-log stats, date ranges, category totals, and a few recent examples. Use for counts, comparisons, and timelines.",
+      inputSchema: z.object({
+        query: z.string().min(1).max(240).optional(),
+        categories: z.array(z.string().min(1)).max(4).optional(),
+        range: z
+          .object({
+            startDate: z.string().regex(DATE_KEY_RE).optional(),
+            endDate: z.string().regex(DATE_KEY_RE).optional(),
+          })
+          .optional(),
+        includeExamples: z.boolean().optional(),
+      }),
+      execute: async ({ query, categories, range, includeExamples }) => {
+        const statsResult = await getCoachStats({
+          userId,
+          query,
+          categories,
+          range,
+          includeExamples,
+          availableCategories: baselineContext.userCategories,
+        });
+
+        return serializeStatsToolResult(statsResult);
       },
-      experimental_onToolCallFinish: ({ success, durationMs, toolCall, output, error }) => {
-        if (!success) {
-          toolNamesErrored.add(toolCall.toolName);
-        }
-      },
-      onFinish: ({ finishReason, steps }) => {
-        scheduleImplicitMemoryRefreshFromChat(userId, typedMessages);
-
-        const toolsFromSteps = uniqueStrings(
-          steps.flatMap((step) => step.toolCalls.map((toolCall) => toolCall.toolName))
-        );
-      },
-    });
-
-    return result.toUIMessageStreamResponse({
-      originalMessages: typedMessages,
-    });
-  } catch (error: unknown) {
-    console.error("[CHAT_ERROR]", error);
-
-    try {
-      await connectToDatabase();
-      await ErrorLog.create({
-        environment: process.env.NODE_ENV || "unknown",
-        context: "Server-ChatAPI",
-        errorMessage: error instanceof Error ? error.message : "Unknown Chat error",
-        stackTrace:
-          process.env.NODE_ENV === "development"
-            ? error instanceof Error
-              ? error.stack
-              : "Unknown stack"
-            : "Hidden in production",
-      });
-    } catch { }
-
-    if (error instanceof Error && error.message.includes("insufficient_quota")) {
-      return new NextResponse(
-        "Service unavailable: OpenAI quota exceeded. Please check billing details.",
-        { status: 503 }
-      );
-    }
-
-    if (process.env.NODE_ENV === "development") {
-      return new NextResponse(
-        error instanceof Error
-          ? error.message || error.stack || "Internal Error"
-          : "Internal Error",
-        { status: 500 }
-      );
-    }
-
-    return new NextResponse("An anomaly occurred during chat.", {
-      status: 500,
-    });
-  }
+    }),
+  };
 }
 
-function uniqueStrings(values: string[]): string[] {
-  return [...new Set(values)];
+// ── Recall-Specific Helpers ─────────────────────────────────
+
+function compactMessages(messages: UIMessage[]): UIMessage[] {
+  if (messages.length <= MAX_CHAT_TURNS_IN_PROMPT + 1) return messages;
+  const first = messages[0];
+  const lastN = messages.slice(-MAX_CHAT_TURNS_IN_PROMPT);
+  return [first, ...lastN];
+}
+
+async function getRelatedLogs(
+  sourceLog: ILogEntry,
+  card: { title: string; category: string; prompt: string },
+  userId: string
+): Promise<CoachContextLog[]> {
+  const query = [
+    `Topic: ${card.title}`,
+    `Category: ${card.category}`,
+    `Key concept: ${card.prompt}`,
+    `Summary: ${truncateText(sourceLog.aiSummary || sourceLog.rawTranscript, 300)}`,
+  ].join("\n");
+
+  let queryEmbedding: number[] | null = null;
+  try {
+    queryEmbedding = await createCoachEmbedding(query, userId);
+  } catch {
+    return [];
+  }
+
+  if (!queryEmbedding) return [];
+
+  const cosineCandidates = await LogEntry.find({
+    userId,
+    _id: { $ne: sourceLog._id },
+    coachEmbeddingVersion: COACH_EMBEDDING_VERSION,
+    embeddingDimensions: COACH_EMBEDDING_DIMENSIONS,
+    category: card.category,
+  })
+    .select("date hours category aiSummary rawTranscript loggedAt createdAt coachEmbedding")
+    .limit(40)
+    .lean<any[]>();
+
+  const sourceDate = new Date(sourceLog.date).getTime();
+
+  const rerankedCosineResults = cosineCandidates
+    .filter(
+      (log) =>
+        Array.isArray(log.coachEmbedding) &&
+        log.coachEmbedding.length === queryEmbedding!.length
+    )
+    .map((log) => {
+      const rawScore = cosineSimilarity(queryEmbedding!, log.coachEmbedding as number[]);
+      const logDate = new Date(log.date).getTime();
+      const daysDelta = Math.abs((sourceDate - logDate) / (1000 * 60 * 60 * 24));
+      const temporalBonus = daysDelta <= 7 ? 0.05 : daysDelta <= 14 ? 0.02 : 0;
+      return { ...log, score: rawScore + temporalBonus };
+    })
+    .filter((log) => (log.score ?? 0) >= 0.35)
+    .sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    .slice(0, 4);
+
+  return rerankedCosineResults.map((log) => ({
+    id: String(log._id),
+    date: log.date,
+    hours: log.hours,
+    category: log.category,
+    aiSummary: typeof log.aiSummary === "string" ? log.aiSummary : "",
+    rawTranscript: log.rawTranscript,
+    score: log.score,
+  }));
+}
+
+// ── Recall System Prompt Builder ────────────────────────────
+
+export interface RecallPromptResult {
+  systemPrompt: string;
+  compactedMessages: UIMessage[];
+}
+
+export async function buildRecallSystemPrompt(input: {
+  userId: string;
+  timezone: string;
+  recallCardId: string;
+  messages: UIMessage[];
+}): Promise<RecallPromptResult> {
+  await connectToDatabase();
+
+  const card = await SmartRecallCard.findOne({
+    _id: input.recallCardId,
+    userId: input.userId,
+  }).lean();
+
+  if (!card) {
+    throw new Error("Recall card not found");
+  }
+
+  // Increment message count for snooze scheduling
+  SmartRecallCard.findByIdAndUpdate(input.recallCardId, {
+    $inc: { drawerMessageCount: 1 },
+  })
+    .exec()
+    .catch(() => {});
+
+  // Source Log
+  const sourceLog = await LogEntry.findOne({
+    _id: card.sourceLogId,
+    userId: input.userId,
+  }).lean<ILogEntry | null>();
+
+  const degradedMode = !sourceLog;
+  const sourceLogSummaryText = degradedMode
+    ? "(Source log was deleted)"
+    : truncateText(
+        sourceLog?.aiSummary || sourceLog?.rawTranscript || "Empty log content",
+        600
+      );
+
+  // Load Related Logs
+  const relatedLogs = degradedMode
+    ? []
+    : await getRelatedLogs(sourceLog!, card as any, input.userId);
+
+  // Context formatting with dynamic token management
+  const includeFullRelatedLogs = input.messages.length <= 4;
+
+  let relatedLogsText = "No strongly related logs found.";
+  if (relatedLogs.length > 0) {
+    relatedLogsText = relatedLogs
+      .map((log) => {
+        if (includeFullRelatedLogs) {
+          return `[Similar log: ${log.date} | ${log.category}] summary: ${truncateText(log.aiSummary || log.rawTranscript, 300)}`;
+        }
+        return `[Similar log: ${log.date} | ${log.category}] (Skipped content for brevity)`;
+      })
+      .join("\n");
+  }
+
+  const systemPrompt = `You are a dedicated tutor for a specific "Smart Recall" card in DiscipLog.
+Your ONLY job is to help the user understand the concept, decision, or detail anchored in this recall context.
+Do not provide general coaching, daily planning, or broad life advice.
+
+If the user asks a question fundamentally unrelated to the recall context or the source log, 
+you must start your response EXACTLY with the text "[REDIRECT]" followed by a brief soft-redirect message offering the main AI Coach.
+
+[Recall Card]
+Title: ${card.title}
+Category: ${card.category}
+Prompt: ${card.prompt}
+Answer: ${card.answer}
+Why it matters: ${card.why}
+
+[Source Log]
+${sourceLogSummaryText}
+
+[Related Logs Context]
+${relatedLogsText}
+
+Rules:
+1. Ground answers in the source log first.
+2. Use related logs only when they genuinely help build a deeper pattern. Never present related-log info as if it came from the source log. Cite your source (e.g., "In a similar log from Jan 10...", "The source log shows...").
+3. Keep responses extremely crisp. 2-5 sentences maximum. Break down complex things quickly.
+4. Do not offer future plans or to-do lists outside the scope of recalling this card.
+5. Emphasize the idea, approach, tradeoff, or outcome correctly.`;
+
+  return {
+    systemPrompt,
+    compactedMessages: compactMessages(input.messages),
+  };
 }

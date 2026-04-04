@@ -147,10 +147,10 @@ export default function CommitmentTracker() {
             style={{
               background: showInput
                 ? "color-mix(in oklch, var(--world-accent) 10%, transparent)"
-                : "var(--v2-surface-raised)",
+                : "var(--world-surface-raised, var(--v2-surface-raised))",
               color: showInput
                 ? "var(--world-accent, var(--v2-amber-400))"
-                : "var(--v2-text-muted)",
+                : "var(--world-text-muted, var(--v2-text-muted))",
               fontFamily: "var(--font-body)",
             }}
           >
@@ -173,9 +173,9 @@ export default function CommitmentTracker() {
               onKeyDown={(e) => e.key === "Enter" && handleAdd()}
               className="flex-1 h-10 rounded-lg border text-sm"
               style={{
-                background: "var(--v2-surface-raised)",
-                borderColor: "var(--v2-border)",
-                color: "var(--v2-text-primary)",
+                background: "var(--world-surface-raised, var(--v2-surface-raised))",
+                borderColor: "var(--world-border, var(--v2-border))",
+                color: "var(--world-text-primary, var(--v2-text-primary))",
                 fontFamily: "var(--font-body)",
               }}
               autoFocus
@@ -206,7 +206,7 @@ export default function CommitmentTracker() {
           <div
             className="text-center py-6 text-sm"
             style={{
-              color: "var(--v2-text-muted)",
+              color: "var(--world-text-muted, var(--v2-text-muted))",
               fontFamily: "var(--font-body)",
             }}
           >
@@ -218,7 +218,7 @@ export default function CommitmentTracker() {
           <p
             className="py-4 text-center text-sm"
             style={{
-              color: "var(--v2-text-muted)",
+              color: "var(--world-text-muted, var(--v2-text-muted))",
               fontFamily: "var(--font-body)",
             }}
           >
@@ -234,8 +234,8 @@ export default function CommitmentTracker() {
                 key={c._id}
                 className="rounded-lg border p-3.5 transition-colors"
                 style={{
-                  background: "var(--v2-surface-raised)",
-                  borderColor: "var(--v2-border)",
+                  background: "var(--world-surface-raised, var(--v2-surface-raised))",
+                  borderColor: "var(--world-border, var(--v2-border))",
                 }}
               >
                 <div className="flex items-start justify-between gap-3">
@@ -243,7 +243,7 @@ export default function CommitmentTracker() {
                     className="text-sm font-medium flex-1 pt-0.5"
                     style={{
                       fontFamily: "var(--font-body)",
-                      color: "var(--v2-text-primary)",
+                      color: "var(--world-text-primary, var(--v2-text-primary))",
                     }}
                   >
                     {c.text}
@@ -292,9 +292,9 @@ export default function CommitmentTracker() {
                       placeholder="What got in the way?"
                       className="flex-1 min-h-[60px] resize-none rounded-lg border text-xs"
                       style={{
-                        background: "var(--v2-surface-overlay)",
-                        borderColor: "var(--v2-border)",
-                        color: "var(--v2-text-primary)",
+                        background: "var(--world-surface-raised, var(--v2-surface-overlay))",
+                        borderColor: "var(--world-border, var(--v2-border))",
+                        color: "var(--world-text-primary, var(--v2-text-primary))",
                         fontFamily: "var(--font-body)",
                       }}
                       autoFocus
@@ -335,7 +335,7 @@ export default function CommitmentTracker() {
                 key={c._id}
                 className="rounded-lg border p-3 flex items-start gap-3"
                 style={{
-                  background: "var(--v2-surface-raised)",
+                  background: "var(--world-surface-raised, var(--v2-surface-raised))",
                   borderColor:
                     c.status === "completed"
                       ? "oklch(0.62 0.14 155 / 15%)"
@@ -368,7 +368,7 @@ export default function CommitmentTracker() {
                   <p
                     className="text-sm line-through"
                     style={{
-                      color: "var(--v2-text-muted)",
+                      color: "var(--world-text-muted, var(--v2-text-muted))",
                       fontFamily: "var(--font-body)",
                     }}
                   >
@@ -378,7 +378,7 @@ export default function CommitmentTracker() {
                     <p
                       className="text-xs mt-1 italic"
                       style={{
-                        color: "var(--v2-text-secondary)",
+                        color: "var(--world-text-secondary, var(--v2-text-secondary))",
                         fontFamily: "var(--font-body)",
                       }}
                     >

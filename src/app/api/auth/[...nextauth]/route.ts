@@ -34,9 +34,11 @@ export const authOptions: NextAuthOptions = {
         await connectToDatabase();
         const dbUser = await User.findOne({ email: session.user.email });
         if (dbUser) {
+          const enriched = session.user as typeof session.user & { id?: string; plan?: string };
           // Expose the MongoDB Object ID as string on the user object for querying logs
-          (session.user as typeof session.user & { id?: string }).id =
-            dbUser._id.toString();
+          enriched.id = dbUser._id.toString();
+          // Expose the subscription plan so the frontend can show pro features
+          enriched.plan = dbUser.subscription?.plan || "free";
         }
       }
       return session;

@@ -188,7 +188,7 @@ function LogCard({
   return (
     <>
       <WorldCard
-        className="transition-all hover:bg-[var(--v2-obsidian-600)]"
+        className="transition-all hover:bg-[var(--world-surface-raised)]"
         style={{ padding: "1rem" }}
       >
         <div className="flex flex-col gap-4">
@@ -242,7 +242,7 @@ function LogCard({
                 ) : null}
                 <div
                   className="flex items-center gap-1.5 text-xs"
-                  style={{ color: "var(--v2-text-muted)" }}
+                  style={{ color: "var(--world-text-muted, var(--v2-text-muted))" }}
                 >
                   <Clock className="w-3.5 h-3.5" />
                   <span className="font-mono">{log.hours.toFixed(2)}h</span>
@@ -250,7 +250,7 @@ function LogCard({
                 {formatSprintMeta(log) ? (
                   <div
                     className="flex items-center gap-1.5 text-xs"
-                    style={{ color: "var(--v2-text-muted)" }}
+                    style={{ color: "var(--world-text-muted, var(--v2-text-muted))" }}
                   >
                     <TimerReset className="w-3.5 h-3.5" />
                     <span className="font-mono">{formatSprintMeta(log)}</span>
@@ -258,7 +258,7 @@ function LogCard({
                 ) : null}
                 <div
                   className="flex items-center gap-1.5 text-xs"
-                  style={{ color: "var(--v2-text-muted)" }}
+                  style={{ color: "var(--world-text-muted, var(--v2-text-muted))" }}
                 >
                   <CalendarDays className="w-3.5 h-3.5" />
                   <span className="font-mono">{formatDateTime(log)}</span>
@@ -268,14 +268,14 @@ function LogCard({
               {log.aiSummary ? (
                 <div
                   className="text-sm leading-relaxed prose prose-sm prose-invert max-w-none"
-                  style={{ color: "var(--v2-text-secondary)" }}
+                  style={{ color: "var(--world-text-secondary, var(--v2-text-secondary))" }}
                   dangerouslySetInnerHTML={{ __html: renderMarkdown(log.aiSummary) }}
                 />
               ) : (
                 <div className="space-y-3 mt-2">
                   <div
                     className="text-sm leading-relaxed italic"
-                    style={{ color: "var(--v2-text-muted)" }}
+                    style={{ color: "var(--world-text-muted, var(--v2-text-muted))" }}
                   >
                     {getSummaryFallback(log)}
                   </div>
@@ -297,9 +297,9 @@ function LogCard({
                 onClick={() => setIsEditorOpen(true)}
                 className="rounded-xl"
                 style={{
-                  background: "var(--v2-surface-raised)",
-                  borderColor: "var(--v2-border-strong)",
-                  color: "var(--v2-text-secondary)",
+                  background: "var(--world-surface-raised, var(--v2-surface-raised))",
+                  borderColor: "var(--world-border, var(--v2-border-strong))",
+                  color: "var(--world-text-secondary, var(--v2-text-secondary))",
                 }}
               >
                 <Pencil className="w-3.5 h-3.5" />
@@ -324,11 +324,11 @@ function LogCard({
           </div>
 
           {log.rawTranscript ? (
-            <div className="pt-4 border-t" style={{ borderColor: "var(--v2-border)" }}>
+            <div className="pt-4 border-t" style={{ borderColor: "var(--world-border, var(--v2-border))" }}>
               <button
                 onClick={() => setIsExpanded((value) => !value)}
                 className="flex items-center gap-2 text-xs uppercase tracking-wider font-semibold transition-colors hover:text-[var(--v2-text-primary)]"
-                style={{ color: "var(--v2-text-muted)" }}
+                style={{ color: "var(--world-text-muted, var(--v2-text-muted))" }}
               >
                 {isExpanded ? (
                   <ChevronUp className="w-4 h-4" />
@@ -342,9 +342,9 @@ function LogCard({
                 <div
                   className="mt-3 p-4 rounded-md font-mono text-xs whitespace-pre-wrap leading-relaxed border"
                   style={{
-                    background: "var(--v2-surface-overlay)",
-                    color: "var(--v2-text-muted)",
-                    borderColor: "var(--v2-border)",
+                    background: "var(--world-surface-raised, var(--v2-surface-overlay))",
+                    color: "var(--world-text-muted, var(--v2-text-muted))",
+                    borderColor: "var(--world-border, var(--v2-border))",
                   }}
                 >
                   {log.rawTranscript}
@@ -366,9 +366,9 @@ function LogCard({
         <DialogContent
           className="sm:max-w-md"
           style={{
-            background: "var(--v2-surface)",
-            borderColor: "var(--v2-border)",
-            color: "var(--v2-text-primary)",
+            background: "var(--world-surface, var(--v2-surface))",
+            borderColor: "var(--world-border, var(--v2-border))",
+            color: "var(--world-text-primary, var(--v2-text-primary))",
           }}
         >
           <DialogHeader>
@@ -377,7 +377,7 @@ function LogCard({
             </DialogTitle>
             <DialogDescription
               style={{
-                color: "var(--v2-text-secondary)",
+                color: "var(--world-text-secondary, var(--v2-text-secondary))",
                 fontFamily: "var(--font-body)",
               }}
             >
@@ -407,8 +407,8 @@ function LogCard({
               className="rounded-xl"
               style={{
                 background: "transparent",
-                borderColor: "var(--v2-border)",
-                color: "var(--v2-text-secondary)",
+                borderColor: "var(--world-border, var(--v2-border))",
+                color: "var(--world-text-secondary, var(--v2-text-secondary))",
               }}
             >
               Cancel
@@ -498,7 +498,7 @@ export default function LogHistoryV2({
             className="text-2xl font-bold tracking-tight mb-1"
             style={{
               fontFamily: "var(--font-display)",
-              color: "var(--v2-text-primary)",
+              color: "var(--world-text-primary, var(--v2-text-primary))",
             }}
           >
             Terminal Ledger
@@ -507,7 +507,7 @@ export default function LogHistoryV2({
             className="text-sm"
             style={{
               fontFamily: "var(--font-body)",
-              color: "var(--v2-text-secondary)",
+              color: "var(--world-text-secondary, var(--v2-text-secondary))",
             }}
           >
             Historical records of your focus blocks.
@@ -518,8 +518,8 @@ export default function LogHistoryV2({
           <TabsList
             className="border"
             style={{
-              background: "var(--v2-surface-overlay)",
-              borderColor: "var(--v2-border)",
+              background: "var(--world-surface-raised, var(--v2-surface-overlay))",
+              borderColor: "var(--world-border, var(--v2-border))",
             }}
           >
             <TabsTrigger value="all" className="data-[state=active]:bg-[var(--v2-surface)] data-[state=active]:text-[var(--world-accent,var(--v2-amber-300))]">
@@ -538,8 +538,8 @@ export default function LogHistoryV2({
       <div className="space-y-4 max-h-[600px] overflow-y-auto pr-2 custom-scrollbar">
         {filteredLogs.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
-            <Inbox className="w-10 h-10 mb-4" style={{ color: "var(--v2-obsidian-300)" }} />
-            <p style={{ color: "var(--v2-text-muted)" }}>
+            <Inbox className="w-10 h-10 mb-4" style={{ color: "var(--world-text-muted, var(--v2-obsidian-300))" }} />
+            <p style={{ color: "var(--world-text-muted, var(--v2-text-muted))" }}>
               No logs found for this timeframe.
             </p>
           </div>

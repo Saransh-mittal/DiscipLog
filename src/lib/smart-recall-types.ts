@@ -43,6 +43,7 @@ export interface SmartRecallCardView {
   completedAt: string | null;
   lastViewedAt: string | null;
   snoozeCount: number;
+  drawerMessageCount: number;
 }
 
 export interface SmartRecallSummary {

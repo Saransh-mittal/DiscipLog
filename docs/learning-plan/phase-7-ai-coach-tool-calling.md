@@ -2,14 +2,15 @@
 
 ## Objective
 
-Understand how the AI Coach in DiscipLog answers questions using a hybrid architecture:
+Understand how the AI Chat system in DiscipLog answers questions using a unified SSOT architecture:
 
+- a single backend route (`/api/ai-chat`) that branches by mode (coach vs recall)
+- a shared context builder (`lib/ai-chat-context.ts`) for system prompts and tools
 - baseline context for recent/today/week awareness
-- tool-calling for deep history and stats
+- tool-calling for deep history and stats (coach mode only)
 - retrieval helpers for safe Mongo-backed evidence lookup
-- streamed UI rendering for both the answer and tool activity
-
-This phase is about understanding **how the system thinks**, not just where the files are.
+- streamed UI rendering for both the answer, tool activity, and reasoning tokens
+- Pro subscription model tier for premium AI model access
 
 ---
 
@@ -23,7 +24,15 @@ Instead, the architecture works like this:
 User asks a question
         │
         ▼
-POST /api/chat
+POST /api/ai-chat
+        │
+        ├─ Resolve model (plan-aware)
+        │   - Free → gpt-5-nano
+        │   - Pro  → gpt-5-mini or gpt-5
+        │
+        ├─ Branch by mode
+        │   ├─ coach: buildCoachSystemPrompt()
+        │   └─ recall: buildRecallSystemPrompt()
         │
         ├─ Build baseline context
         │   - recent logs
@@ -31,7 +40,7 @@ POST /api/chat
         │   - commitments
         │   - implicit memory
         │
-        ├─ Register tools for the model
+        ├─ Register tools (coach only)
         │   - searchHistoricalLogs
         │   - getCoachStats
         │
@@ -40,12 +49,14 @@ POST /api/chat
         │   - backend executes tool safely
         │   - model sees tool result
         │   - model writes final answer
+        │   - (pro) reasoning tokens streamed
         │
         ▼
 UI stream returns to frontend
         │
         ├─ answer text rendered with markdown
-        └─ tool activity rendered in accordion cards
+        ├─ tool activity rendered in accordion cards
+        └─ (pro) reasoning rendered in collapsible accordion
 ```
 
 This is the core lesson:
@@ -58,34 +69,39 @@ This is the core lesson:
 
 Start with:
 
-- [src/app/api/chat/route.ts](/Users/saranshmittal/Desktop/DiscipLog/src/app/api/chat/route.ts)
+- [src/app/api/ai-chat/route.ts](/Users/saranshmittal/Desktop/DiscipLog/src/app/api/ai-chat/route.ts)
 
-This file is the orchestration layer.
+This file is the unified orchestration layer for both coach and recall modes.
 
 ### What to look for
 
 1. `POST(req: Request)`
    This is the route handler the chat UI calls.
 
-2. `buildSystemPrompt(...)`
-   This prepares the coach’s baseline knowledge before the model starts answering.
+2. `mode === "recall"` branch
+   Recall mode builds a recall-specific system prompt with no tools.
 
-3. `streamText({...})`
-   This is where the actual model call happens.
+3. Coach mode (default branch)
+   Builds the coach system prompt and registers tools.
 
-4. `tools: { ... }`
-   This is where the model is given callable server tools.
+4. `resolveChatModel(plan, preferredModel)`
+   Server-side model resolution based on subscription plan.
 
-5. `toUIMessageStreamResponse({ originalMessages })`
-   This sends the streamed result back to the frontend without duplicating assistant messages.
+5. `proReasoningOptions`
+   Pro models get reasoning enabled via `providerOptions`.
+
+6. `toUIMessageStreamResponse({ sendReasoning })`
+   Sends the streamed result back, including reasoning tokens for pro users.
 
 ### What you should understand after reading this file
 
 - where auth happens
+- where model resolution is done (plan-aware)
+- where the mode branching occurs
 - where baseline context is injected
-- where tools are registered
-- where tool logs are emitted
+- where tools are registered (coach only)
 - where the stream is returned to the UI
+- where reasoning is enabled for pro
 
 ---
 
@@ -93,9 +109,11 @@ This file is the orchestration layer.
 
 Then open:
 
+- [src/lib/ai-chat-context.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/ai-chat-context.ts)
 - [src/lib/coach-context.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/coach-context.ts)
 
-This file contains the real retrieval engine.
+`ai-chat-context.ts` is the SSOT for system prompts and tool definitions.
+`coach-context.ts` contains the underlying retrieval engine and stats computation.
 
 ### Two layers of context exist
 
@@ -192,9 +210,9 @@ Model language is useful, but it should guide retrieval, not override schema rea
 
 ## Phase 7.4: Learn the Two Tool Types
 
-Back in [src/app/api/chat/route.ts](/Users/saranshmittal/Desktop/DiscipLog/src/app/api/chat/route.ts), study the tool registration.
+Back in [src/app/api/ai-chat/route.ts](/Users/saranshmittal/Desktop/DiscipLog/src/app/api/ai-chat/route.ts) (coach mode branch) and [src/lib/ai-chat-context.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/ai-chat-context.ts), study the tool registration.
 
-You’ll see this pattern:
+You'll see the tools are built by `buildCoachTools()` in `ai-chat-context.ts`:
 
 ```ts
 tool({
@@ -252,7 +270,7 @@ The coach needs both.
 
 ## Phase 7.5: Understand Tool Calling Itself
 
-Here are the key lines to conceptually understand in [src/app/api/chat/route.ts](/Users/saranshmittal/Desktop/DiscipLog/src/app/api/chat/route.ts):
+Here are the key lines to conceptually understand in [src/app/api/ai-chat/route.ts](/Users/saranshmittal/Desktop/DiscipLog/src/app/api/ai-chat/route.ts) (coach mode):
 
 - `toolChoice: "auto"`
 - `stopWhen: stepCountIs(4)`
@@ -351,7 +369,7 @@ It makes the coach more trustworthy.
 
 Now move to the frontend:
 
-- [src/components/AIAssistantV2.tsx](/Users/saranshmittal/Desktop/DiscipLog/src/components/AIAssistantV2.tsx)
+- [src/components/AIChatDrawer.tsx](/Users/saranshmittal/Desktop/DiscipLog/src/components/AIChatDrawer.tsx)
 - [src/components/ToolCallAccordion.tsx](/Users/saranshmittal/Desktop/DiscipLog/src/components/ToolCallAccordion.tsx)
 - [src/components/ChatMarkdown.tsx](/Users/saranshmittal/Desktop/DiscipLog/src/components/ChatMarkdown.tsx)
 
@@ -363,7 +381,12 @@ It also streams tool parts like:
 - `tool-searchHistoricalLogs`
 - `tool-getCoachStats`
 
-`AIAssistantV2.tsx` parses those tool parts and turns them into structured `ToolCallData`.
+And for pro users, it also streams `reasoning` parts.
+
+`AIChatDrawer.tsx` handles both coach and recall modes via the `ChatMode` discriminated union. It:
+- Parses tool parts and turns them into structured `ToolCallData`
+- Extracts `reasoning` parts from messages for the `ReasoningAccordion`
+- Handles `[REDIRECT]` responses in recall mode
 
 `ToolCallAccordion.tsx` renders:
 
@@ -387,16 +410,15 @@ Tool calling becomes much more trustworthy when the user can see:
 - what kind of result it got
 - whether the answer came from evidence or just baseline context
 
+Pro reasoning adds another layer of transparency by showing the model's thought process.
+
 ---
 
 ## Phase 7.9: Learn the Logging Strategy
 
-Back in [src/app/api/chat/route.ts](/Users/saranshmittal/Desktop/DiscipLog/src/app/api/chat/route.ts), study the debug logs:
+Back in [src/app/api/ai-chat/route.ts](/Users/saranshmittal/Desktop/DiscipLog/src/app/api/ai-chat/route.ts), the error logging and debug patterns remain the same.
 
-- `[AI_COACH_RAG_DEBUG]`
-- `[AI_COACH_TOOL_CALL_START]`
-- `[AI_COACH_TOOL_CALL_FINISH]`
-- `[AI_COACH_TOOL_SUMMARY]`
+Note: With the unified route, debug logs now cover both coach and recall modes.
 
 ### Why these logs matter
 
@@ -422,12 +444,15 @@ This is how you make AI systems debuggable instead of mystical.
 
 Read in this order:
 
-1. [src/app/api/chat/route.ts](/Users/saranshmittal/Desktop/DiscipLog/src/app/api/chat/route.ts)
-2. [src/lib/coach-context.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/coach-context.ts)
-3. [src/lib/coach-embeddings.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/coach-embeddings.ts)
-4. [src/components/AIAssistantV2.tsx](/Users/saranshmittal/Desktop/DiscipLog/src/components/AIAssistantV2.tsx)
-5. [src/components/ToolCallAccordion.tsx](/Users/saranshmittal/Desktop/DiscipLog/src/components/ToolCallAccordion.tsx)
-6. [src/components/ChatMarkdown.tsx](/Users/saranshmittal/Desktop/DiscipLog/src/components/ChatMarkdown.tsx)
+1. [src/app/api/ai-chat/route.ts](/Users/saranshmittal/Desktop/DiscipLog/src/app/api/ai-chat/route.ts)
+2. [src/lib/ai-chat-context.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/ai-chat-context.ts)
+3. [src/lib/ai-models.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/ai-models.ts)
+4. [src/lib/coach-context.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/coach-context.ts)
+5. [src/lib/coach-embeddings.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/coach-embeddings.ts)
+6. [src/lib/rate-limit.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/rate-limit.ts)
+7. [src/components/AIChatDrawer.tsx](/Users/saranshmittal/Desktop/DiscipLog/src/components/AIChatDrawer.tsx)
+8. [src/components/ToolCallAccordion.tsx](/Users/saranshmittal/Desktop/DiscipLog/src/components/ToolCallAccordion.tsx)
+9. [src/components/ChatMarkdown.tsx](/Users/saranshmittal/Desktop/DiscipLog/src/components/ChatMarkdown.tsx)
 
 ---
 
@@ -487,3 +512,52 @@ You’ve understood this phase when you can explain:
 6. how the frontend renders tool activity from streamed parts
 
 If you can explain those six points in your own words, you understand the architecture well enough to extend it safely.
+
+---
+
+## Phase 7.10: Understand the Pro Model Tier
+
+Open:
+
+- [src/lib/ai-models.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/ai-models.ts)
+- [src/lib/rate-limit.ts](/Users/saranshmittal/Desktop/DiscipLog/src/lib/rate-limit.ts)
+
+### Model Resolution
+
+The `resolveChatModel()` function maps subscription plans to OpenAI models:
+
+- Free → `gpt-5-nano` (always, regardless of client input)
+- Pro → `gpt-5-mini` or `gpt-5` (based on `preferredModel`)
+
+The server **never trusts the client**. It reads `user.subscription.plan` from MongoDB.
+
+### Rate Limiting
+
+The rate limiter uses separate Upstash Redis sliding windows:
+
+- `disciplog:ratelimit:ai:free` → 50 messages/day
+- `disciplog:ratelimit:ai:pro` → 150 messages/day
+
+### Reasoning Tokens
+
+Pro models support reasoning (chain-of-thought) tokens:
+
+1. Backend enables `providerOptions.openai.reasoningEffort: "medium"`
+2. Backend streams reasoning via `sendReasoning: true`
+3. Frontend extracts `reasoning` parts from `UIMessage.parts`
+4. `ReasoningAccordion` component renders them in a collapsible section
+5. Auto-expands while streaming, user can collapse manually
+
+Free users (nano) never receive reasoning tokens — the option is simply not passed.
+
+### The Design Lesson
+
+Pro features are additive layers on top of the free experience.
+The same code path handles both — the difference is in:
+
+- which model is resolved
+- which rate limit prefix is used
+- whether reasoning options are passed
+- whether the frontend renders reasoning UI
+
+This makes the Pro tier easy to extend without forking the codebase.

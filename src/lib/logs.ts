@@ -1,6 +1,6 @@
 // Legacy categories for backwards compatibility with existing log entries
 export const LOG_CATEGORIES = [
-  "Interview Prep",
+  "Focused Practice",
   "Building",
   "Learning",
   "Shipping",

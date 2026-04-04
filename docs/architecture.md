@@ -8,7 +8,7 @@ DiscipLog is a robust discipline-logging application designed to be scalable, re
 - **Styling:** Tailwind CSS + shadcn/ui
 - **Database:** MongoDB (via Mongoose) + MongoDB Atlas Vector Search
 - **Auth:** NextAuth (Auth.js) via Google OAuth
-- **AI Analytics:** OpenAI (`gpt-5-nano`) server-side — summarization, coaching, tool-calling RAG, nudge generation, weekly debrief narratives, implicit memory evaluation
+- **AI Analytics:** OpenAI server-side — `gpt-5-nano` (free), `gpt-5-mini` / `gpt-5` (pro) for interactive chat; `gpt-5-nano` for all background tasks (summarization, coaching, tool-calling RAG, nudge generation, weekly debrief narratives, implicit memory evaluation)
 - **AI SDK:** Vercel AI SDK (`ai` + `@ai-sdk/openai` + `@ai-sdk/react`) for streaming, tool registration, and embeddings
 - **UI/UX:** V2 Minimal Typographic design system (Light/Dark themes via `ThemeProvider`) with Momentum gamification world-tier skins
 - **Push Notifications:** `web-push` (VAPID) + Service Worker (`public/sw.js`)
@@ -42,14 +42,32 @@ Instead of failing silently to standard Next.js 500 pages, errors are ingested i
 1. **Environment Awareness:** API routes use `NODE_ENV` to determine payload shape. During local development, the full stack trace is returned to the payload so the frontend can render standard Next.js dev overlays. In production, stack traces are scrubbed from the response and secretly logged to the DB instead, responding to the frontend with generic UX-friendly messages.
 2. **Client-Side Graceful Degradation:** A `GlobalErrorBoundary` wraps the entire application. When an unexpected crash occurs, users see a high-end UI crash screen containing a textbox. Users can type what they were trying to accomplish when the app crashed; this context is automatically merged with the client-side trace and `POST`ed into `/api/errors`.
 
-## AI Coach Architecture (Tool-Calling RAG)
-The AI Coach (`AIAssistantV2`) does not directly read MongoDB. Instead, it uses a hybrid retrieval approach:
+## AI Chat Architecture (Unified SSOT)
+The AI Chat system uses a **Single Source of Truth** architecture. Both the AI Coach and Smart Recall "Ask AI" features share a single frontend component (`AIChatDrawer`) and a single backend route (`/api/ai-chat`), differentiated by a `ChatMode` discriminated union.
 
-1. **Baseline Context:** Always injected into the system prompt — recent logs, weekly stats, commitments, implicit memory, user categories and targets.
-2. **Tool-Calling:** The model is given two registered tools (`searchHistoricalLogs`, `getCoachStats`) and decides at runtime whether it needs deeper evidence. Tools are validated with Zod schemas and executed server-side.
+### Unified Components
+- **Frontend:** `AIChatDrawer.tsx` renders both coach mode (FAB + full-height drawer, speech recognition, tool accordions) and recall mode (externally-controlled drawer, card context subtitle, redirect handling).
+- **Backend:** `/api/ai-chat/route.ts` branches on `mode: "coach" | "recall"` to build the appropriate system prompt and tool set.
+- **Context Builder:** `lib/ai-chat-context.ts` contains shared helpers and both `buildCoachSystemPrompt()` and `buildRecallSystemPrompt()` functions.
+
+### Coach Mode
+1. **Baseline Context:** Always injected — recent logs, weekly stats, commitments, implicit memory, user categories and targets.
+2. **Tool-Calling:** The model is given two tools (`searchHistoricalLogs`, `getCoachStats`) and decides at runtime whether it needs deeper evidence. Tools are validated with Zod schemas and executed server-side.
 3. **Retrieval Fallback Chain:** `searchHistoricalLogs` uses a 3-tier fallback: Atlas vector search → app-side cosine similarity on stored embeddings → keyword/category fallback.
 4. **Embeddings:** `coach-embeddings.ts` handles `text-embedding-3-small` vector generation for each log entry, stored as `coachEmbedding` on the `LogEntry` document.
 5. **Query Signals:** `buildCoachQuerySignals()` classifies each user query to separate real DB categories from model-invented labels, preventing brittle retrieval.
+
+### Recall Mode
+- **No tools** — relies purely on context injection (card data + source log + related logs via cosine similarity).
+- **Soft Redirect:** Off-topic questions trigger a `[REDIRECT]` prefix response with a bridge to the AI Coach.
+
+### Pro Subscription Model Tier
+- **Schema:** `User.subscription` subdocument with `plan` (`"free"` / `"pro"`) and `preferredModel` (`"gpt-5-mini"` / `"gpt-5"`).
+- **Model Resolution:** `lib/ai-models.ts` server-validates the plan from DB — never trusts client input. Free → `gpt-5-nano`, Pro → user's preferred model.
+- **Rate Limiting:** `lib/rate-limit.ts` is plan-aware: Free = 50 messages/day, Pro = 150 messages/day (separate Upstash sliding windows).
+- **Reasoning:** Pro models stream reasoning tokens via `sendReasoning: true`. The frontend renders these in a collapsible `ReasoningAccordion` within message bubbles.
+- **Settings:** Pro users see a model selector (dropdown near textarea in drawer + radio buttons in Settings page). Free users see "Using GPT-5 Nano" in Settings.
+- **Activation:** Currently manual via MongoDB: set `subscription.plan: "pro"` on the user document.
 
 ## Motivation Engine (Phase 3)
 DiscipLog transitions from a passive listener into an active companion:
@@ -71,6 +89,7 @@ Smart Recall is no longer a stateless "daily deck" destination. It is a persiste
 3. **Queue States:** Cards move through `due`, `snoozed`, and `completed`, allowing the app to show `ready`, `scheduled`, `cleared`, and `locked` states on the Overview bonus widget.
 4. **Workflow Integration:** The shared Smart Recall provider listens for log-save events and can auto-open the next due card after manual logs or sprint saves.
 5. **Tier-Synced UX:** The recall bonus card, tutorial, and recall session all inherit the active world tier's surfaces, borders, spacing, and motion so the feature feels native to the current momentum skin rather than bolted on.
+6. **Ask AI Drawer:** Uses the unified `AIChatDrawer` in recall mode. Surfaces strictly after card revelation, maintains its own semantic context based on the recall card, and shares rate limits with the coach mode. High chat-message interactions heuristically lower snooze intervals to target struggled domains.
 
 ## Documentation Structure
 - `docs/components.md` - Tracks the purpose of shared atomic elements.
@@ -99,6 +118,9 @@ Smart Recall is no longer a stateless "daily deck" destination. It is a persiste
 - `src/lib/momentum.ts` — streak power and daily energy computation for the Momentum system.
 - `src/lib/smart-recall-types.ts` — shared Smart Recall enums and wire types used by both client and server.
 - `src/lib/smart-recall.ts` — Smart Recall queue generation, lifecycle transitions, unlock logic, and API summary shaping.
+- `src/lib/rate-limit.ts` — Upstash Redis rate throttling with plan-aware limits (50/day free, 150/day pro) using separate sliding windows.
+- `src/lib/ai-models.ts` — Server-side model resolution. Validates subscription plan from DB and maps to OpenAI model identifiers.
+- `src/lib/ai-chat-context.ts` — Single Source of Truth for chat system prompts. Contains `buildCoachSystemPrompt()`, `buildRecallSystemPrompt()`, `buildCoachTools()`, and shared formatting helpers.
 - `src/lib/push-service.ts` — VAPID-authenticated Web Push notification dispatch.
 - `src/lib/usage-patterns.ts` — rolling average logging-time analysis for smart nudge timing.
 - `src/lib/proactive-insights.ts` — contextual intelligence for nudge and debrief generation.

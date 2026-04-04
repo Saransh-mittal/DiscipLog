@@ -17,7 +17,7 @@ const CompletionCelebration = dynamic(() => import("@/components/CompletionCeleb
 
 /* ────────────────────────────────────────────────
    Realistic user journey presets
-   Targets: PB 2.5h, IP 2.5h, DL 1h, RR 0.5h (optional)
+   Targets: PB 2.5h, FP 2.5h, DL 1h, RR 0.5h (optional)
    Daily total target: 6.5h (main cats only)
    ──────────────────────────────────────────────── */
 
@@ -65,8 +65,8 @@ const PRESETS: Preset[] = [
       streakPower: 0, streakPowerTier: "dormant",
       todayHours: 3.5, todayLogCount: 4, todayTargetPercent: 55,
       weeklyHours: 3.5, streakDays: 0,
-      todayByCategory: { "Project Building": 1.5, "Interview Preparation": 1.5, "Daily Learning": 0.5 },
-      weeklyByCategory: { "Project Building": 1.5, "Interview Preparation": 1.5, "Daily Learning": 0.5 },
+      todayByCategory: { "Project Building": 1.5, "Focused Practice": 1.5, "Daily Learning": 0.5 },
+      weeklyByCategory: { "Project Building": 1.5, "Focused Practice": 1.5, "Daily Learning": 0.5 },
     },
   },
 
@@ -80,8 +80,8 @@ const PRESETS: Preset[] = [
       streakPower: 1, streakPowerTier: "ember",
       todayHours: 6.5, todayLogCount: 8, todayTargetPercent: 100,
       weeklyHours: 9.7, streakDays: 1,
-      todayByCategory: { "Project Building": 2.5, "Interview Preparation": 2.5, "Daily Learning": 1.0, "Rapid Recap": 0.5 },
-      weeklyByCategory: { "Project Building": 4, "Interview Preparation": 3.7, "Daily Learning": 1.5, "Rapid Recap": 0.5 },
+      todayByCategory: { "Project Building": 2.5, "Focused Practice": 2.5, "Daily Learning": 1.0, "Rapid Recap": 0.5 },
+      weeklyByCategory: { "Project Building": 4, "Focused Practice": 3.7, "Daily Learning": 1.5, "Rapid Recap": 0.5 },
     },
   },
   {
@@ -93,8 +93,8 @@ const PRESETS: Preset[] = [
       streakPower: 1, streakPowerTier: "ember",
       todayHours: 5.2, todayLogCount: 6, todayTargetPercent: 80,
       weeklyHours: 14.9, streakDays: 2,
-      todayByCategory: { "Project Building": 2.0, "Interview Preparation": 1.8, "Daily Learning": 0.9, "Rapid Recap": 0.5 },
-      weeklyByCategory: { "Project Building": 6, "Interview Preparation": 5.5, "Daily Learning": 2.4, "Rapid Recap": 1.0 },
+      todayByCategory: { "Project Building": 2.0, "Focused Practice": 1.8, "Daily Learning": 0.9, "Rapid Recap": 0.5 },
+      weeklyByCategory: { "Project Building": 6, "Focused Practice": 5.5, "Daily Learning": 2.4, "Rapid Recap": 1.0 },
     },
   },
 
@@ -108,8 +108,8 @@ const PRESETS: Preset[] = [
       streakPower: 2, streakPowerTier: "campfire",
       todayHours: 5.0, todayLogCount: 6, todayTargetPercent: 77,
       weeklyHours: 22, streakDays: 3,
-      todayByCategory: { "Project Building": 2.0, "Interview Preparation": 1.8, "Daily Learning": 0.8, "Rapid Recap": 0.4 },
-      weeklyByCategory: { "Project Building": 9, "Interview Preparation": 8, "Daily Learning": 3.5, "Rapid Recap": 1.5 },
+      todayByCategory: { "Project Building": 2.0, "Focused Practice": 1.8, "Daily Learning": 0.8, "Rapid Recap": 0.4 },
+      weeklyByCategory: { "Project Building": 9, "Focused Practice": 8, "Daily Learning": 3.5, "Rapid Recap": 1.5 },
     },
   },
   {
@@ -121,8 +121,8 @@ const PRESETS: Preset[] = [
       streakPower: 2, streakPowerTier: "campfire",
       todayHours: 7.2, todayLogCount: 9, todayTargetPercent: 100,
       weeklyHours: 29, streakDays: 4,
-      todayByCategory: { "Project Building": 2.5, "Interview Preparation": 2.5, "Daily Learning": 1.2, "Rapid Recap": 1.0 },
-      weeklyByCategory: { "Project Building": 11.5, "Interview Preparation": 10.5, "Daily Learning": 4.5, "Rapid Recap": 2.5 },
+      todayByCategory: { "Project Building": 2.5, "Focused Practice": 2.5, "Daily Learning": 1.2, "Rapid Recap": 1.0 },
+      weeklyByCategory: { "Project Building": 11.5, "Focused Practice": 10.5, "Daily Learning": 4.5, "Rapid Recap": 2.5 },
     },
   },
   {
@@ -135,7 +135,7 @@ const PRESETS: Preset[] = [
       todayHours: 1.5, todayLogCount: 2, todayTargetPercent: 25,
       weeklyHours: 30.5, streakDays: 5,
       todayByCategory: { "Project Building": 1.5 },
-      weeklyByCategory: { "Project Building": 13, "Interview Preparation": 10.5, "Daily Learning": 4.5, "Rapid Recap": 2.5 },
+      weeklyByCategory: { "Project Building": 13, "Focused Practice": 10.5, "Daily Learning": 4.5, "Rapid Recap": 2.5 },
     },
   },
 
@@ -149,8 +149,8 @@ const PRESETS: Preset[] = [
       streakPower: 3, streakPowerTier: "inferno",
       todayHours: 7.0, todayLogCount: 9, todayTargetPercent: 100,
       weeklyHours: 42, streakDays: 7,
-      todayByCategory: { "Project Building": 2.5, "Interview Preparation": 2.5, "Daily Learning": 1.0, "Rapid Recap": 1.0 },
-      weeklyByCategory: { "Project Building": 15, "Interview Preparation": 14, "Daily Learning": 7, "Rapid Recap": 6 },
+      todayByCategory: { "Project Building": 2.5, "Focused Practice": 2.5, "Daily Learning": 1.0, "Rapid Recap": 1.0 },
+      weeklyByCategory: { "Project Building": 15, "Focused Practice": 14, "Daily Learning": 7, "Rapid Recap": 6 },
     },
   },
   {
@@ -162,8 +162,8 @@ const PRESETS: Preset[] = [
       streakPower: 3, streakPowerTier: "inferno",
       todayHours: 6.5, todayLogCount: 8, todayTargetPercent: 100,
       weeklyHours: 38, streakDays: 10,
-      todayByCategory: { "Project Building": 2.5, "Interview Preparation": 2.5, "Daily Learning": 1.0, "Rapid Recap": 0.5 },
-      weeklyByCategory: { "Project Building": 14, "Interview Preparation": 14, "Daily Learning": 6, "Rapid Recap": 5 },
+      todayByCategory: { "Project Building": 2.5, "Focused Practice": 2.5, "Daily Learning": 1.0, "Rapid Recap": 0.5 },
+      weeklyByCategory: { "Project Building": 14, "Focused Practice": 14, "Daily Learning": 6, "Rapid Recap": 5 },
     },
   },
 
@@ -177,8 +177,8 @@ const PRESETS: Preset[] = [
       streakPower: 4, streakPowerTier: "legendary",
       todayHours: 7.5, todayLogCount: 10, todayTargetPercent: 100,
       weeklyHours: 52, streakDays: 14,
-      todayByCategory: { "Project Building": 2.5, "Interview Preparation": 2.5, "Daily Learning": 1.5, "Rapid Recap": 1.0 },
-      weeklyByCategory: { "Project Building": 18, "Interview Preparation": 18, "Daily Learning": 8, "Rapid Recap": 8 },
+      todayByCategory: { "Project Building": 2.5, "Focused Practice": 2.5, "Daily Learning": 1.5, "Rapid Recap": 1.0 },
+      weeklyByCategory: { "Project Building": 18, "Focused Practice": 18, "Daily Learning": 8, "Rapid Recap": 8 },
     },
   },
   {
@@ -190,8 +190,8 @@ const PRESETS: Preset[] = [
       streakPower: 4, streakPowerTier: "legendary",
       todayHours: 6.8, todayLogCount: 8, todayTargetPercent: 100,
       weeklyHours: 48, streakDays: 21,
-      todayByCategory: { "Project Building": 2.5, "Interview Preparation": 2.0, "Daily Learning": 1.3, "Rapid Recap": 1.0 },
-      weeklyByCategory: { "Project Building": 17, "Interview Preparation": 16, "Daily Learning": 8, "Rapid Recap": 7 },
+      todayByCategory: { "Project Building": 2.5, "Focused Practice": 2.0, "Daily Learning": 1.3, "Rapid Recap": 1.0 },
+      weeklyByCategory: { "Project Building": 17, "Focused Practice": 16, "Daily Learning": 8, "Rapid Recap": 7 },
     },
   },
 ];

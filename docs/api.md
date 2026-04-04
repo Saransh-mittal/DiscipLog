@@ -4,12 +4,16 @@
 ### User
 - Handles individual identity. Includes `name`, `email`, `image` per NextAuth/Google scope.
 - `onboardingCompleted`: Boolean flag indicating if the user has completed the initial setup flow.
-- `categories`: Array of up to 7 dynamic `UserCategory` objects defined by the user. Each category contains:
+- `categories`: Array of up to 8 dynamic `UserCategory` objects defined by the user. Each category contains:
   - `name`: Display string for the category (e.g. "Piano Practice").
   - `icon`: String mapping to a pre-defined subset of `lucide-react` icons.
   - `dailyTargetHours`: Daily tracking target for UI components.
   - `weeklyMinTarget` / `weeklyMaxTarget`: Weekly boundaries for UI displays.
   - `isSideCategory`: Optional boolean for secondary tracking categories.
+- `subscription`: Embedded subdocument for Pro subscription model tier:
+  - `plan`: One of `"free"` or `"pro"` (default: `"free"`). Controls AI model access and rate limits.
+  - `preferredModel`: One of `"gpt-5-mini"` or `"gpt-5"` (default: `"gpt-5-mini"`). Only applies when `plan` is `"pro"`.
+  - `upgradedAt`: Optional timestamp of when the user was upgraded to Pro.
 - `aiProfile`: Embedded subdocument (`StoredAIProfile`) containing:
   - `persona`: One of `drill_sergeant`, `mentor`, `analyst`, `hype_man`.
   - `coreWhy`: User's personal motivation statement.
@@ -171,14 +175,36 @@ Supports two payload shapes:
 - `POST`: Creates a new `"pending"` commitment for the current week.
 - `PATCH`: Expects `{ id, status }`. Allows marking a commitment as `"completed"` or `"missed"`. If status is missed, it expects an optional `missReason`. The server then hits OpenAI to rewrite the rationale into an accountable `missReasonAI` statement before saving.
 
-### `POST /api/chat`
-**Body:** `{ messages, logs, timezone }`
-- Productivity coach endpoint. Feeds the user's weekly targets, active commitments, aggregate stats, and raw transcripts into OpenAI to provide personalized, context-aware advice. Formats event timestamps using `loggedAt ?? createdAt` relative to the user's provided `timezone`.
-- Dynamically gathers the contextual targets directly from the DB (`user.categories`) rather than relying on hardcoded system prompts.
+### `POST /api/ai-chat` (Unified AI Chat)
+**Body:** `{ messages, timezone, mode, recallCardId?, preferredModel? }`
+- **Single unified endpoint** replacing the old `/api/chat` (coach) and `/api/recall/chat` (recall) routes.
+- The `mode` field (`"coach"` or `"recall"`) determines behavior:
+
+**Coach Mode** (`mode: "coach"`):
+- Productivity coach endpoint. Feeds the user's weekly targets, active commitments, aggregate stats, and raw transcripts into OpenAI to provide personalized, context-aware advice.
+- Dynamically gathers contextual targets from the DB (`user.categories`).
 - **Tool-calling:** Registers `searchHistoricalLogs` and `getCoachStats` tools with Zod schemas. The model decides at runtime whether to invoke them (`toolChoice: "auto"`, bounded by `stepCountIs(4)`).
+- **After stream:** Fires `scheduleImplicitMemoryRefreshFromChat()` non-blocking.
+
+**Recall Mode** (`mode: "recall"`):
+- Recall-scoped AI tutoring for the Smart Recall "Ask AI" drawer. Requires `recallCardId`.
+- **No tools** — relies purely on context injection (card data + source log + related logs via cosine similarity).
+- **Soft Redirect:** If a user diverges from the recall topic, responds with `[REDIRECT]` prefix. The UI offers a bridge to the AI Coach.
+- **Context Compaction:** Sliding-window conversation history for token budget management.
+- Updates `drawerMessageCount` internally for snooze scheduling.
+
+**Shared behavior (both modes):**
+- **Rate-limited:** Uses `@upstash/ratelimit` with plan-aware limits — Free: 50/day, Pro: 150/day.
+- **Model resolution:** Server validates `user.subscription.plan` from DB (never trusts client). Free → `gpt-5-nano`, Pro → `gpt-5-mini` or `gpt-5` (based on `preferredModel`).
+- **Pro reasoning:** Pro models receive `providerOptions` with `reasoningEffort: "medium"` and `reasoningSummary: "auto"`. Reasoning tokens are streamed to the client via `sendReasoning: true`.
 - Streams responses via `toUIMessageStreamResponse()` with `smoothStream()` pacing.
-- **After stream:** Fires `scheduleImplicitMemoryRefreshFromChat()` non-blocking via `queueMicrotask`.
 - Requires `OPENAI_API_KEY` on the server.
+
+### `PATCH /api/settings/model`
+**Body:** `{ preferredModel }`
+- Allows Pro users to persist their preferred chat model (`"gpt-5-mini"` or `"gpt-5"`).
+- Server validates that the user is on the Pro plan before allowing the update.
+- Returns `{ ok: true, preferredModel }` on success.
 
 ### `GET /api/recall`
 **Query:** `?timezone=Asia/Kolkata`

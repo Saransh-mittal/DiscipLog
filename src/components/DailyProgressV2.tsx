@@ -207,7 +207,7 @@ export default function DailyProgressV2() {
                       <div
                         className="absolute -top-2 -right-2 flex items-center justify-center min-w-[18px] h-[18px] rounded-full text-[10px] font-black shadow-md z-10"
                         style={{
-                          background: 'var(--v2-amber-400)',
+                          background: 'var(--world-accent, var(--v2-amber-400))',
                           color: 'var(--v2-obsidian-900)',
                           fontFamily: "var(--font-display)",
                         }}

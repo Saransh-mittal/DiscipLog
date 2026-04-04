@@ -268,7 +268,7 @@ export default function OnboardingFlow({ userName }: OnboardingFlowProps) {
                     placeholder={
                       isListening
                         ? "Listening..."
-                        : "e.g. I prep for interviews, build side projects, learn new tech, and exercise..."
+                        : "e.g. I study new skills, build side projects, exercise, and read every day..."
                     }
                     className="min-h-[140px] w-full resize-none rounded-xl border text-sm leading-relaxed"
                     style={{

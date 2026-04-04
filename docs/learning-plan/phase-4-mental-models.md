@@ -102,3 +102,30 @@ Returns StoredAIProfile (fully typed, safe to use)
 ```
 
 **Key insight to recall:** Every field in the returned object has been *actively verified*, not just assumed. The function can never return a malformed profile — TypeScript and runtime logic agree. This pattern is called "Parse, Don't Validate" and it's a cornerstone of robust backend code.
+
+---
+
+## Mental Model 5: Context Windows as a "Sliding Scale"
+
+**Visualize this:**
+
+When managing LLM chat limits (like in `RecallAskAIDrawer`), you can't just send every message indefinitely, or you'll exceed token limits and rack up massive usage fees.
+
+Imagine you are reading a book through a magnifying glass that only fits 4 paragraphs at a time.
+1. The **first paragraph** sets the scene (the initial prompt). You NEVER want to lose this.
+2. The **middle paragraphs** are context you've already read and processed.
+3. The **last 3 paragraphs** are what's happening *right now*.
+
+```
+[System Prompt]                  ← Fixed.
+[User: "What does this mean?"]   ← Keep (vital anchor)
+[AI: "It means X"]               ← Drop as it gets old
+[User: "Ah, and what about Y?"]  ← Keep (recent)
+[AI: "Y means..."]               ← Keep (recent)
+```
+
+By "compacting" the context window (keeping `messages[0]` and `messages.slice(-MAX_TURNS)`), the AI remembers the original premise but forgets the meandering middle of the conversation, keeping the context window incredibly stable and performant.
+
+---
+
+> **📝 Paper Journal:** Concise, handwriting-optimized versions of these mental models — plus additional ones covering Tool-Calling RAG, Smart Recall, Motivation Engine, Momentum, Pro tiers, and DNS/CDN — are consolidated in **[Phase 5: Paper Engineering Journal](./phase-5-paper-journal.md)**. Use Phase 4 for deep understanding; use Phase 5 for quick revision and interview recall.

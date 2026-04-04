@@ -7,6 +7,56 @@
  */
 
 /* ══════════════════════════════════════════════════════
+   SKELETON LOADER — Recall page loading state
+   ══════════════════════════════════════════════════════ */
+
+.recall-loading-skeleton {
+  animation: recall-skeleton-in 400ms ease both;
+}
+
+@keyframes recall-skeleton-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.recall-skeleton-pulse {
+  animation: recall-pulse 1.6s ease-in-out infinite;
+}
+
+@keyframes recall-pulse {
+  0%, 100% { opacity: 0.45; }
+  50%      { opacity: 0.85; }
+}
+
+
+/* ══════════════════════════════════════════════════════
+   CARD LIST — Flat card rows
+   ══════════════════════════════════════════════════════ */
+
+.recall-card-row {
+  cursor: default;
+}
+
+.recall-status-dot {
+  animation: recall-dot-pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes recall-dot-pulse {
+  0%, 100% { opacity: 0.7; transform: scale(1); }
+  50%      { opacity: 1; transform: scale(1.25); }
+}
+
+/* Command bar */
+.recall-cmd-bar {
+  transition: border-color 200ms ease;
+}
+
+.recall-bonus-card {
+  transition: border-color 200ms ease;
+}
+
+
+/* ══════════════════════════════════════════════════════
    BASE — Shared recall session structure
    ══════════════════════════════════════════════════════ */
 
@@ -172,15 +222,6 @@
   gap: 0.5rem;
 }
 
-/* ── Card + hover ── */
-.recall-card-item {
-  cursor: default;
-}
-
-.recall-bonus-card {
-  transition: border-color 200ms ease;
-}
-
 /* ── Responsive ── */
 @media (max-width: 640px) {
   .recall-tour-content {
@@ -228,8 +269,8 @@
   border-color: oklch(0.60 0.06 260 / 28%);
 }
 
-[data-streak-power="0"] .recall-card-item:hover {
-  border-color: oklch(0.60 0.06 260 / 26%) !important;
+[data-streak-power="0"] .recall-card-row:hover {
+  background: oklch(0.60 0.06 260 / 6%);
 }
 [data-streak-power="0"] .recall-bonus-card:hover {
   border-color: oklch(0.60 0.06 260 / 28%) !important;
@@ -266,8 +307,8 @@
   border-color: oklch(0.68 0.14 50 / 28%);
 }
 
-[data-streak-power="1"] .recall-card-item:hover {
-  border-color: oklch(0.68 0.14 50 / 28%) !important;
+[data-streak-power="1"] .recall-card-row:hover {
+  background: oklch(0.68 0.14 50 / 6%);
 }
 [data-streak-power="1"] .recall-bonus-card:hover {
   border-color: oklch(0.68 0.14 50 / 30%) !important;
@@ -304,8 +345,8 @@
   border-color: oklch(0.80 0.20 50 / 32%);
 }
 
-[data-streak-power="2"] .recall-card-item:hover {
-  border-color: oklch(0.80 0.20 50 / 30%) !important;
+[data-streak-power="2"] .recall-card-row:hover {
+  background: oklch(0.80 0.20 50 / 5%);
 }
 [data-streak-power="2"] .recall-bonus-card:hover {
   border-color: oklch(0.80 0.20 50 / 32%) !important;
@@ -342,8 +383,8 @@
   border-color: oklch(0.78 0.08 235 / 28%);
 }
 
-[data-streak-power="3"] .recall-card-item:hover {
-  border-color: oklch(0.78 0.08 235 / 28%) !important;
+[data-streak-power="3"] .recall-card-row:hover {
+  background: oklch(0.78 0.08 235 / 6%);
 }
 [data-streak-power="3"] .recall-bonus-card:hover {
   border-color: oklch(0.78 0.08 235 / 30%) !important;
@@ -380,8 +421,8 @@
   border-color: oklch(0.50 0.06 75 / 14%);
 }
 
-[data-streak-power="4"] .recall-card-item:hover {
-  border-color: oklch(0.50 0.06 75 / 14%) !important;
+[data-streak-power="4"] .recall-card-row:hover {
+  background: oklch(0.50 0.06 75 / 4%);
 }
 [data-streak-power="4"] .recall-bonus-card:hover {
   border-color: oklch(0.50 0.06 75 / 14%) !important;

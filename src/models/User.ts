@@ -25,12 +25,22 @@ export interface IUserCategory {
   notes?: ICategoryNote[];
 }
 
+export type SubscriptionPlan = "free" | "pro";
+export type ProModelChoice = "gpt-5-mini" | "gpt-5";
+
+export interface IUserSubscription {
+  plan: SubscriptionPlan;
+  preferredModel: ProModelChoice;
+  upgradedAt?: Date;
+}
+
 export interface IUser extends Document {
   name: string;
   email: string;
   image?: string;
   categories: IUserCategory[];
   aiProfile: StoredAIProfile;
+  subscription: IUserSubscription;
   smartRecall?: {
     tutorialSeenAt: Date | null;
   };
@@ -87,6 +97,15 @@ const AIProfileSchema = new Schema(
   { _id: false }
 );
 
+const SubscriptionSchema = new Schema(
+  {
+    plan: { type: String, enum: ["free", "pro"], default: "free" },
+    preferredModel: { type: String, enum: ["gpt-5-mini", "gpt-5"], default: "gpt-5-mini" },
+    upgradedAt: { type: Date, default: null },
+  },
+  { _id: false }
+);
+
 const SmartRecallSchema = new Schema(
   {
     tutorialSeenAt: { type: Date, default: null },
@@ -109,6 +128,10 @@ const UserSchema: Schema = new Schema({
   },
   aiProfile: {
     type: AIProfileSchema,
+    default: () => ({}),
+  },
+  subscription: {
+    type: SubscriptionSchema,
     default: () => ({}),
   },
   smartRecall: {

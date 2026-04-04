@@ -23,6 +23,7 @@ export interface ISmartRecallCard extends Document {
   snoozeCount: number;
   createdAt: Date;
   updatedAt: Date;
+  drawerMessageCount: number;
 }
 
 const SmartRecallCardSchema = new Schema<ISmartRecallCard>(
@@ -46,6 +47,7 @@ const SmartRecallCardSchema = new Schema<ISmartRecallCard>(
     completedAt: { type: Date, default: null },
     lastViewedAt: { type: Date, default: null },
     snoozeCount: { type: Number, default: 0, min: 0 },
+    drawerMessageCount: { type: Number, default: 0, min: 0 },
   },
   { timestamps: true }
 );

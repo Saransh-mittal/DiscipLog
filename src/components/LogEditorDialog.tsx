@@ -301,7 +301,9 @@ export default function LogEditorDialog({
                 id={`transcript-${log._id}`}
                 value={rawTranscript}
                 onChange={(event) => setRawTranscript(event.target.value)}
-                className="min-h-[170px] rounded-xl resize-y"
+                minRows={6}
+                maxRows={15}
+                className="rounded-xl custom-scrollbar"
                 style={{
                   background: "var(--v2-obsidian-700)",
                   borderColor: "var(--v2-border)",
@@ -353,7 +355,9 @@ export default function LogEditorDialog({
                 id={`summary-${log._id}`}
                 value={aiSummary}
                 onChange={(event) => setAiSummary(event.target.value)}
-                className="min-h-[140px] rounded-xl resize-y"
+                minRows={5}
+                maxRows={15}
+                className="rounded-xl custom-scrollbar"
                 style={{
                   background: "var(--v2-obsidian-700)",
                   borderColor: "var(--v2-border)",

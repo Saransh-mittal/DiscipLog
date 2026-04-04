@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useSession } from "next-auth/react";
 import { Clock, TrendingUp } from "lucide-react";
 import { useMomentum } from "@/components/MomentumProvider";
 import { useLogs } from "@/components/LogsProvider";
@@ -8,7 +9,7 @@ import { useActiveTab, type DashboardTab } from "@/components/DashboardNav";
 import { useWorld } from "@/components/worlds/WorldRenderer";
 import CalendarV2 from "@/components/CalendarV2";
 import WeeklyProgressV2 from "@/components/WeeklyProgressV2";
-import AIAssistantV2 from "@/components/AIAssistantV2";
+import AIChatDrawer from "@/components/AIChatDrawer";
 import DailyProgressV2 from "@/components/DailyProgressV2";
 import CommitmentTracker from "@/components/CommitmentTracker";
 import MomentumFlame from "@/components/MomentumFlame";
@@ -96,6 +97,8 @@ export default function DashboardTabPage() {
   const { activeTab } = useActiveTab();
   const { loading: momentumLoading } = useMomentum();
   const { logs, loading, refreshLogs } = useLogs();
+  const { data: session } = useSession();
+  const isPro = (session?.user as any)?.plan === "pro";
 
   const [backgroundTabsMounted, setBackgroundTabsMounted] = useState(false);
 
@@ -127,7 +130,28 @@ export default function DashboardTabPage() {
                   color: "var(--world-text-primary, var(--v2-text-primary))",
                 }}
               >
-                Overview
+                <span className="inline-flex items-center gap-2.5">
+                  Overview
+                  {isPro && (
+                    <span
+                      className="relative overflow-hidden inline-flex items-center"
+                      style={{
+                        background: "linear-gradient(135deg, oklch(0.68 0.19 60), oklch(0.58 0.18 50))",
+                        color: "oklch(0.13 0.01 60)",
+                        fontWeight: 700,
+                        fontSize: "10px",
+                        letterSpacing: "0.08em",
+                        textTransform: "uppercase" as const,
+                        padding: "2px 7px",
+                        borderRadius: "5px",
+                        lineHeight: 1.4,
+                        verticalAlign: "middle",
+                      }}
+                    >
+                      PRO
+                    </span>
+                  )}
+                </span>
               </h1>
               <p
                 className="max-w-xl text-base leading-relaxed"
@@ -151,7 +175,6 @@ export default function DashboardTabPage() {
             <WeeklyProgressV2 />
             <CalendarV2 logs={logs} loading={loading} />
             <EndOfDayMicroReview />
-            <AIAssistantV2 logs={logs} />
           </div>
         </div>
       )}
@@ -162,7 +185,6 @@ export default function DashboardTabPage() {
           <div className="log-page-stack">
             <SprintTimerCard onLogSaved={refreshLogs} />
             <LoggerV2 onLogSaved={refreshLogs} />
-            <AIAssistantV2 logs={logs} />
           </div>
         </div>
       )}
@@ -174,20 +196,22 @@ export default function DashboardTabPage() {
             <section>
               <h1
                 className="mb-2 text-3xl font-extrabold leading-tight tracking-tighter md:text-4xl"
-                style={{ fontFamily: "var(--font-display)" }}
+                style={{
+                  fontFamily: "var(--font-display)",
+                  color: "var(--world-text-primary, var(--v2-text-primary))",
+                }}
               >
                 History
               </h1>
               <p
                 className="max-w-xl text-base leading-relaxed"
-                style={{ color: "var(--v2-text-secondary)" }}
+                style={{ color: "var(--world-text-secondary, var(--v2-text-secondary))" }}
               >
                 Your complete record of focus blocks and sprints.
               </p>
             </section>
 
             <LogHistoryV2 logs={logs} loading={loading} refreshLogs={refreshLogs} />
-            <AIAssistantV2 logs={logs} />
           </div>
         </div>
       )}
@@ -197,7 +221,6 @@ export default function DashboardTabPage() {
         <div style={{ display: activeTab === "recall" ? "block" : "none" }}>
           <div className="space-y-8">
             <SmartRecallFeed />
-            <AIAssistantV2 logs={logs} />
           </div>
         </div>
       )}
@@ -215,6 +238,8 @@ export default function DashboardTabPage() {
           <DebriefArchive />
         </div>
       )}
+      {/* ── AI Coach Drawer (always mounted, single instance) ── */}
+      <AIChatDrawer mode={{ type: "coach" }} />
     </>
   );
 }

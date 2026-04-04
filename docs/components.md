@@ -98,12 +98,15 @@ Chronological feed displaying historical work logs broken down into "All Session
 - Uses a destructive confirmation dialog before permanent deletion through `DELETE /api/logs/[id]`.
 - Renders both manual and sprint logs from the same shared `LogEntry` feed.
 
-### `AIAssistantV2`
-- Floating productivity coach panel powered by **OpenAI (`gpt-5-nano`)**. 
-- Integrated with `@ai-sdk/react` (`useChat`) for robust real-time streaming capability via `toUIMessageStreamResponse()` and `smoothStream()` pacing.
-- **Tool-Calling UI:** Parses streamed tool parts (`tool-searchHistoricalLogs`, `tool-getCoachStats`) into structured `ToolCallData` objects and renders them as expandable accordion cards via `ToolCallAccordion`.
-- **Premium UI/UX:** Boasts a glassmorphic aesthetic inspired by modern design trends, including animated "Thinking..." bouncing dots during reasoning phases, fade-in message entrance animations, an active blinking cursor during generation, and continuous `requestAnimationFrame` auto-scrolling.
-- **Dynamic Context:** Automatically tracks user state and binds the latest manual and sprint logs, user-defined category targets, active weekly commitments, and timezone to the `sendMessage` body payload on every request, ensuring the AI insights are aggressively up-to-date and temporally accurate.
+### `AIChatDrawer` (Unified AI Chat)
+- **Single Source of Truth** component replacing the former `AIAssistantV2` (coach) and `RecallAskAIDrawer` (recall).
+- Differentiated by a `ChatMode` discriminated union: `{ type: "coach" }` or `{ type: "recall"; cardId; cardTitle; category }`.
+- **Coach mode:** Floating FAB + full-height right-side drawer with speech recognition, tool call accordions, animated greeting, and glassmorphic dark theme.
+- **Recall mode:** Externally controlled open/close, card context subtitle in header, `[REDIRECT]` handling with bridge-to-coach button, world-tier theming.
+- Integrated with `@ai-sdk/react` (`useChat`) for streaming via the unified `/api/ai-chat` route.
+- **Pro Model Selector:** Pro users see a compact dropdown above the textarea to choose between GPT-5 Mini and GPT-5.
+- **Reasoning Accordion:** Pro model responses include a collapsible `ReasoningAccordion` showing the model's chain-of-thought reasoning with auto-expand during streaming.
+- Mounted once at the dashboard page level (coach mode) to avoid duplicate mounts across tabs.
 
 ### `ToolCallAccordion`
 - Renders AI Coach tool activity as expandable accordion cards within the chat feed.
@@ -117,6 +120,7 @@ Chronological feed displaying historical work logs broken down into "All Session
 - Shared client-side Smart Recall orchestrator mounted inside the world-tier shell.
 - Fetches `GET /api/recall`, keeps the queue fresh when snoozes expire, and listens for post-save log events so recall can surface directly after manual logs and sprint saves.
 - Owns the one-card-at-a-time recall session modal and the first-run tutorial modal.
+- Renders the unified `AIChatDrawer` in recall mode for the "Ask AI" feature.
 - Preserves a stable Smart Recall identity while still inheriting active world-tier surfaces, borders, motion, and spacing through `useWorld()`.
 
 ### `RecallBonusCard`
@@ -171,7 +175,7 @@ Terminal-styled error boundary that provides localized graceful degradation. Cap
 
 ### `useSpeechRecognition`
 - Custom React hook wrapping the Web Speech API for voice-to-text dictation.
-- Used by `LoggerV2` and `SprintTimerCard` for transcript input.
+- Used by `AIChatDrawer` (coach mode) and `SprintTimerCard` for transcript input.
 
 ### `usePushNotifications`
 - Custom React hook managing Web Push subscription lifecycle.

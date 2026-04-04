@@ -37,7 +37,7 @@ function usePreloadComponents() {
       import("@/components/WeeklyProgressV2");
       import("@/components/DailyProgressV2");
       import("@/components/MomentumFlame");
-      import("@/components/AIAssistantV2");
+      import("@/components/AIChatDrawer");
       import("@/components/SmartRecallFeed");
       import("@/components/RecallBonusCard");
       import("@/components/EndOfDayMicroReview");

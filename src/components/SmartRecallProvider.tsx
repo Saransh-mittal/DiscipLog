@@ -33,6 +33,10 @@ import {
   type SmartRecallRarity,
   type SmartRecallSummary,
 } from "@/lib/smart-recall-types";
+import AIChatDrawer from "./AIChatDrawer";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
+import type { Components } from "react-markdown";
 
 interface SmartRecallContextValue {
   summary: SmartRecallSummary | null;
@@ -101,6 +105,164 @@ function RarityBadge({
     >
       <Icon className="h-3.5 w-3.5" />
       {meta.label}
+    </div>
+  );
+}
+
+function RecallMarkdown({ content }: { content: string }) {
+  const { theme } = useWorld();
+  
+  const components: Components = useMemo(
+    () => ({
+      p: ({ children }) => <p className="mb-3 last:mb-0 leading-relaxed text-base">{children}</p>,
+      strong: ({ children }) => (
+        <strong style={{ color: theme.textPrimary, fontWeight: 700 }}>{children}</strong>
+      ),
+      em: ({ children }) => (
+        <em style={{ fontStyle: "italic", color: theme.textSecondary }}>{children}</em>
+      ),
+      h1: ({ children }) => (
+        <h3
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "18px",
+            fontWeight: 800,
+            color: theme.textPrimary,
+            margin: "1.2em 0 0.5em 0",
+          }}
+        >
+          {children}
+        </h3>
+      ),
+      h2: ({ children }) => (
+        <h4
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "16px",
+            fontWeight: 800,
+            color: theme.textPrimary,
+            margin: "1em 0 0.4em 0",
+          }}
+        >
+          {children}
+        </h4>
+      ),
+      h3: ({ children }) => (
+        <h5
+          style={{
+            fontFamily: "var(--font-display)",
+            fontSize: "15px",
+            fontWeight: 700,
+            color: theme.textPrimary,
+            margin: "0.8em 0 0.3em 0",
+          }}
+        >
+          {children}
+        </h5>
+      ),
+      ul: ({ children }) => (
+        <ul
+          style={{
+            margin: "0.5em 0 1em 0",
+            paddingLeft: "1.2em",
+            listStyleType: "disc",
+            color: theme.textPrimary,
+          }}
+        >
+          {children}
+        </ul>
+      ),
+      ol: ({ children }) => (
+        <ol
+          style={{
+            margin: "0.5em 0 1em 0",
+            paddingLeft: "1.2em",
+            listStyleType: "decimal",
+            color: theme.textPrimary,
+          }}
+        >
+          {children}
+        </ol>
+      ),
+      li: ({ children }) => <li style={{ marginBottom: "0.3em" }}>{children}</li>,
+      code: ({ children, className }) => {
+        const isBlock = className?.startsWith("language-");
+        if (isBlock) {
+          return (
+            <code
+              style={{
+                display: "block",
+                background: "color-mix(in oklch, var(--world-surface-raised) 60%, transparent)",
+                border: `1px solid color-mix(in oklch, ${theme.accent} 20%, transparent)`,
+                borderRadius: "8px",
+                padding: "0.8em 1em",
+                fontSize: "13px",
+                fontFamily: "'SF Mono', 'Fira Code', monospace",
+                overflowX: "auto",
+                margin: "0.6em 0 1em 0",
+                whiteSpace: "pre-wrap",
+                color: theme.textSecondary,
+              }}
+            >
+              {children}
+            </code>
+          );
+        }
+        return (
+          <code
+            style={{
+              background: "color-mix(in oklch, var(--world-surface-raised) 70%, transparent)",
+              borderRadius: "4px",
+              padding: "0.15em 0.3em",
+              fontSize: "13px",
+              fontFamily: "'SF Mono', 'Fira Code', monospace",
+              color: theme.accent,
+            }}
+          >
+            {children}
+          </code>
+        );
+      },
+      pre: ({ children }) => <pre style={{ margin: 0, overflow: "hidden" }}>{children}</pre>,
+      a: ({ children, href }) => (
+        <a
+          href={href}
+          target="_blank"
+          rel="noopener noreferrer"
+          style={{
+            color: theme.accent,
+            textDecoration: "underline",
+            textUnderlineOffset: "2px",
+          }}
+        >
+          {children}
+        </a>
+      ),
+      blockquote: ({ children }) => (
+        <blockquote
+          style={{
+            borderLeft: `3px solid ${theme.accent}`,
+            paddingLeft: "1em",
+            margin: "0.8em 0 1em 0",
+            color: theme.textSecondary,
+            fontStyle: "italic",
+            background: "color-mix(in oklch, var(--world-accent) 5%, transparent)",
+            padding: "0.8em 1em",
+            borderRadius: "0 8px 8px 0",
+          }}
+        >
+          {children}
+        </blockquote>
+      ),
+    }),
+    [theme]
+  );
+
+  return (
+    <div className="recall-markdown whitespace-normal break-words">
+      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
+        {content}
+      </ReactMarkdown>
     </div>
   );
 }
@@ -310,6 +472,7 @@ function RecallSessionPanel({
   onSnooze,
   onComplete,
   onClose,
+  onAskAI,
   actionLoading,
   timezone,
 }: {
@@ -319,6 +482,7 @@ function RecallSessionPanel({
   onSnooze: () => void;
   onComplete: () => void;
   onClose: () => void;
+  onAskAI: () => void;
   actionLoading: boolean;
   timezone: string;
 }) {
@@ -440,12 +604,9 @@ function RecallSessionPanel({
             >
               Recall Prompt
             </p>
-            <p
-              className="mt-3 whitespace-pre-wrap text-base leading-relaxed"
-              style={{ color: theme.textPrimary }}
-            >
-              {card.prompt}
-            </p>
+            <div className="mt-3">
+               <RecallMarkdown content={card.prompt} />
+            </div>
           </div>
 
           {/* Answer zone — solid opaque */}
@@ -490,64 +651,87 @@ function RecallSessionPanel({
                 opacity: revealed ? 1 : 0.72,
               }}
             >
-              <p className="whitespace-pre-wrap text-base leading-relaxed">
-                {revealed ? card.answer : "Try to recall it before you open the answer."}
-              </p>
+              {revealed ? (
+                <RecallMarkdown content={card.answer} />
+              ) : (
+                <p className="whitespace-pre-wrap text-base leading-relaxed">
+                  Try to recall it before you open the answer.
+                </p>
+              )}
             </div>
           </div>
 
           {/* Action buttons */}
-          <div className="recall-session-actions flex flex-col gap-3 sm:flex-row">
-            <Button
-              onClick={onSnooze}
-              disabled={!revealed || actionLoading}
-              variant="outline"
-              className="h-11 flex-1 rounded-full"
-              style={{
-                borderColor: `color-mix(in oklch, ${theme.accent} 22%, transparent)`,
-                background: solidSurfaceRaised,
-                color: theme.textSecondary,
-              }}
-            >
-              {actionLoading ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Updating
-                </>
-              ) : (
-                <>
-                  <Clock3 className="h-4 w-4" />
-                  Need Again
-                </>
-              )}
-            </Button>
+          {revealed && (
+            <>
+              <div className="recall-session-actions flex flex-col gap-3 sm:flex-row">
+                <Button
+                  onClick={onSnooze}
+                  disabled={actionLoading}
+                  variant="outline"
+                  className="h-11 flex-1 rounded-full"
+                  style={{
+                    borderColor: `color-mix(in oklch, ${theme.accent} 22%, transparent)`,
+                    background: solidSurfaceRaised,
+                    color: theme.textSecondary,
+                  }}
+                >
+                  {actionLoading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Updating
+                    </>
+                  ) : (
+                    <>
+                      <Clock3 className="h-4 w-4" />
+                      Need Again
+                    </>
+                  )}
+                </Button>
 
-            <Button
-              onClick={onComplete}
-              disabled={!revealed || actionLoading}
-              className="h-11 flex-1 rounded-full"
-              style={{
-                background: theme.accent,
-                color: tier === 4 ? "oklch(0.12 0.01 70)" : "oklch(0.12 0.01 250)",
-              }}
-            >
-              {actionLoading ? (
-                <>
-                  <RefreshCw className="h-4 w-4 animate-spin" />
-                  Updating
-                </>
-              ) : (
-                <>
-                  <CheckCircle2 className="h-4 w-4" />
-                  Got It
-                </>
-              )}
-            </Button>
-          </div>
+                <Button
+                  onClick={onComplete}
+                  disabled={actionLoading}
+                  className="h-11 flex-1 rounded-full"
+                  style={{
+                    background: theme.accent,
+                    color: tier === 4 ? "oklch(0.12 0.01 70)" : "oklch(0.12 0.01 250)",
+                  }}
+                >
+                  {actionLoading ? (
+                    <>
+                      <RefreshCw className="h-4 w-4 animate-spin" />
+                      Updating
+                    </>
+                  ) : (
+                    <>
+                      <CheckCircle2 className="h-4 w-4" />
+                      Got It
+                    </>
+                  )}
+                </Button>
+                
+                <Button
+                  onClick={onAskAI}
+                  disabled={actionLoading}
+                  variant="outline"
+                  className="h-11 flex-[0.5] rounded-full border-dashed"
+                  style={{
+                    borderColor: `color-mix(in oklch, ${theme.accent} 40%, transparent)`,
+                    background: "transparent",
+                    color: theme.accent,
+                  }}
+                >
+                  <Sparkles className="h-4 w-4" />
+                  Ask AI
+                </Button>
+              </div>
 
-          <p className="text-xs leading-relaxed" style={{ color: theme.textMuted }}>
-            Need Again brings this card back in 1 hour. Got It removes it from the queue for good.
-          </p>
+              <p className="text-xs leading-relaxed" style={{ color: theme.textMuted }}>
+                Need Again brings this card back in 1 hour. Got It removes it from the queue for good.
+              </p>
+            </>
+          )}
         </div>
       </div>
     </div>
@@ -570,6 +754,7 @@ export default function SmartRecallProvider({
   const [error, setError] = useState<string | null>(null);
   const [sessionOpen, setSessionOpen] = useState(false);
   const [tourOpen, setTourOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [tourStep, setTourStep] = useState(0);
   const [revealed, setRevealed] = useState(false);
   const [actionLoading, setActionLoading] = useState(false);
@@ -690,6 +875,7 @@ export default function SmartRecallProvider({
   const closeSession = useCallback(() => {
     setSessionOpen(false);
     setTourOpen(false);
+    setDrawerOpen(false);
     setRevealed(false);
   }, []);
 
@@ -846,20 +1032,34 @@ export default function SmartRecallProvider({
               {/* Session card */}
               <div className="recall-session-container">
                 {summary && summary.activeCard ? (
-                  <RecallSessionPanel
-                    summary={summary}
-                    revealed={revealed}
-                    onReveal={() => setRevealed(true)}
-                    onSnooze={() => {
-                      void runCardAction("snooze");
-                    }}
-                    onComplete={() => {
-                      void runCardAction("complete");
-                    }}
-                    onClose={closeSession}
-                    actionLoading={actionLoading}
-                    timezone={timezone}
-                  />
+                  <>
+                    <RecallSessionPanel
+                      summary={summary}
+                      revealed={revealed}
+                      onReveal={() => setRevealed(true)}
+                      onSnooze={() => {
+                        void runCardAction("snooze");
+                      }}
+                      onComplete={() => {
+                        void runCardAction("complete");
+                      }}
+                      onClose={closeSession}
+                      onAskAI={() => setDrawerOpen(true)}
+                      actionLoading={actionLoading}
+                      timezone={timezone}
+                    />
+                    <AIChatDrawer
+                      mode={{
+                        type: "recall",
+                        cardId: summary.activeCard.id,
+                        cardTitle: summary.activeCard.title,
+                        category: summary.activeCard.category,
+                      }}
+                      isOpen={drawerOpen}
+                      onClose={() => setDrawerOpen(false)}
+                      timezone={timezone}
+                    />
+                  </>
                 ) : null}
               </div>
             </div>

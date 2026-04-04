@@ -29,8 +29,8 @@ function getIntensity(hours: number): number {
 
 const INTENSITY_STYLES: Record<number, { bg: string; border: string }> = {
   0: {
-    bg: "var(--v2-surface-raised)",
-    border: "var(--v2-border)",
+    bg: "var(--world-surface-raised, var(--v2-surface-raised))",
+    border: "var(--world-border, var(--v2-border))",
   },
   1: {
     bg: "color-mix(in oklch, var(--world-accent) 10%, transparent)",
@@ -132,7 +132,7 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
           <div
             className="flex-1 flex items-center justify-center text-sm"
             style={{
-              color: "var(--v2-text-muted)",
+              color: "var(--world-text-muted, var(--v2-text-muted))",
               fontFamily: "var(--font-body)",
             }}
           >
@@ -157,7 +157,7 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
                         style={{
                           width: "14px",
                           marginRight: "3px",
-                          color: "var(--v2-text-muted)",
+                          color: "var(--world-text-muted, var(--v2-text-muted))",
                           fontFamily: "var(--font-body)",
                         }}
                       >
@@ -189,7 +189,7 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
                     style={{
                       height: "14px",
                       width: "24px",
-                      color: "var(--v2-obsidian-300)",
+                      color: "var(--world-text-muted, var(--v2-obsidian-300))",
                       fontFamily: "var(--font-body)",
                     }}
                   >
@@ -221,7 +221,7 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
                                   ? "transparent"
                                   : styles.bg,
                                 borderColor: isFuture
-                                  ? "var(--v2-border)"
+                                  ? "var(--world-border, var(--v2-border))"
                                   : styles.border,
                                 opacity: isFuture ? 0.3 : 1,
                                 boxShadow:
@@ -234,9 +234,9 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
                           <TooltipContent
                             className="text-xs border px-3 py-2"
                             style={{
-                              background: "var(--v2-obsidian-600)",
-                              borderColor: "var(--v2-border-strong)",
-                              color: "var(--v2-text-primary)",
+                              background: "var(--world-surface, var(--v2-obsidian-600))",
+                              borderColor: "var(--world-border, var(--v2-border-strong))",
+                              color: "var(--world-text-primary, var(--v2-text-primary))",
                               fontFamily: "var(--font-body)",
                             }}
                           >
@@ -256,14 +256,14 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
             {/* Legend + stats */}
             <div
               className="mt-6 pt-5 border-t flex items-center justify-between flex-wrap gap-4"
-              style={{ borderColor: "var(--v2-border)" }}
+              style={{ borderColor: "var(--world-border, var(--v2-border))" }}
             >
               {/* Legend */}
               <div className="flex items-center gap-2">
                 <span
                   className="text-[10px] font-medium"
                   style={{
-                    color: "var(--v2-text-muted)",
+                    color: "var(--world-text-muted, var(--v2-text-muted))",
                     fontFamily: "var(--font-body)",
                   }}
                 >
@@ -284,7 +284,7 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
                 <span
                   className="text-[10px] font-medium"
                   style={{
-                    color: "var(--v2-text-muted)",
+                    color: "var(--world-text-muted, var(--v2-text-muted))",
                     fontFamily: "var(--font-body)",
                   }}
                 >
@@ -296,7 +296,7 @@ export default function CalendarV2({ logs, loading }: CalendarV2Props) {
               <div
                 className="flex items-center gap-4 text-[11px] font-semibold"
                 style={{
-                  color: "var(--v2-text-muted)",
+                  color: "var(--world-text-muted, var(--v2-text-muted))",
                   fontFamily: "var(--font-body)",
                 }}
               >

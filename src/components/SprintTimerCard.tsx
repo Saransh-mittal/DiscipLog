@@ -8,6 +8,7 @@ import {
   type SprintCompletionStatus,
 } from "@/lib/logs";
 import { Textarea } from "@/components/ui/textarea";
+import TextareaAutosize from "react-textarea-autosize";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import {
@@ -22,17 +23,22 @@ import {
   AlertCircle,
   Bell,
   BellOff,
+  Check,
   CheckCircle2,
+  ChevronDown,
+  Circle,
   Flag,
   Loader2,
   Mic,
   Minus,
   Pause,
+  Pencil,
   Play,
   Plus,
   Sparkles,
   Square,
   TimerReset,
+  Trash2,
 } from "lucide-react";
 import { SMART_RECALL_LOG_SAVED_EVENT } from "@/lib/smart-recall-types";
 
@@ -273,7 +279,7 @@ function splitSummaryBullets(summary: string | null) {
 }
 
 export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
-  const { categories } = useCategoriesContext();
+  const { categories, refreshCategories, updateCategory } = useCategoriesContext();
   const [sprint, setSprint] = useState<SprintState>(() => createIdleSprint());
   const [customMinutesInput, setCustomMinutesInput] = useState("50");
   const [incrementMinutesInput, setIncrementMinutesInput] = useState("");
@@ -291,6 +297,13 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
     plannedMinutes: number;
   } | null>(null);
   const [justCompleted, setJustCompleted] = useState(false);
+  const [quickNoteText, setQuickNoteText] = useState("");
+  const [quickNoteCategory, setQuickNoteCategory] = useState<string>("");
+  const [isAddingNote, setIsAddingNote] = useState(false);
+  const [noteSuccess, setNoteSuccess] = useState(false);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingNoteValue, setEditingNoteValue] = useState("");
+  const [savingNoteEdit, setSavingNoteEdit] = useState(false);
   const sprintRef = useRef(sprint);
   const dictationSeedRef = useRef("");
   const completionHandledRef = useRef(false);
@@ -442,6 +455,14 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
   const completionReady = sprint.status === "awaiting_checkin";
   const completionBullets = splitSummaryBullets(savedSummary);
 
+  const activeCategoryName = quickNoteCategory || sprint.category;
+  const activeCategory = categories.find((c) => c.name === activeCategoryName);
+  const activeCategoryId = activeCategory?._id ? String(activeCategory._id) : null;
+  const activeNotes = activeCategory?.notes || [];
+  const pendingNotes = activeNotes.filter((n) => !n.done);
+  const doneNotes = activeNotes.filter((n) => n.done);
+  const sortedNotes = [...pendingNotes, ...doneNotes];
+
   useEffect(() => {
     if (typeof window === "undefined") {
       return;
@@ -532,6 +553,7 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
     setIsDialogOpen(false);
     setJustCompleted(false);
     completionHandledRef.current = false;
+    setQuickNoteText("");
     setSprint((prev) =>
       createIdleSprint({
         category: prev.category,
@@ -732,6 +754,107 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
       );
     } finally {
       setIsSaving(false);
+    }
+  };
+
+  const handleAddQuickNote = async () => {
+    const categoryName = quickNoteCategory || sprint.category;
+    if (!quickNoteText.trim() || !categoryName) return;
+
+    setIsAddingNote(true);
+    setNoteSuccess(false);
+
+    try {
+      const cat = categories.find((c) => c.name === categoryName);
+      if (!cat || !cat._id) throw new Error("Category not found");
+
+      const res = await fetch("/api/categories/notes", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          categoryId: String(cat._id),
+          text: quickNoteText.trim(),
+        }),
+      });
+
+      if (!res.ok) {
+        throw new Error("Failed to add note");
+      }
+
+      const newNote = await res.json();
+      updateCategory(String(cat._id), (current) => ({
+        ...current,
+        notes: [...(current.notes || []), newNote],
+      }));
+      refreshCategories();
+
+      setQuickNoteText("");
+      setNoteSuccess(true);
+      setTimeout(() => setNoteSuccess(false), 2000);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setIsAddingNote(false);
+    }
+  };
+
+  const handleToggleNote = async (categoryId: string, noteId: string, done: boolean) => {
+    updateCategory(categoryId, (c) => ({
+      ...c,
+      notes: (c.notes || []).map((n) => (n._id === noteId ? { ...n, done } : n)),
+    }));
+    try {
+      const res = await fetch("/api/categories/notes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryId, noteId, done }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      refreshCategories();
+    }
+  };
+
+  const handleDeleteNote = async (categoryId: string, noteId: string) => {
+    updateCategory(categoryId, (c) => ({
+      ...c,
+      notes: (c.notes || []).filter((n) => n._id !== noteId),
+    }));
+    try {
+      const res = await fetch("/api/categories/notes", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryId, noteId }),
+      });
+      if (!res.ok) throw new Error();
+    } catch {
+      refreshCategories();
+    }
+  };
+
+  const handleSaveEditNote = async (categoryId: string, noteId: string) => {
+    const nextText = editingNoteValue.trim();
+    if (!nextText) {
+      setEditingNoteId(null);
+      return;
+    }
+    setSavingNoteEdit(true);
+    updateCategory(categoryId, (c) => ({
+      ...c,
+      notes: (c.notes || []).map((n) => (n._id === noteId ? { ...n, text: nextText } : n)),
+    }));
+    try {
+      const res = await fetch("/api/categories/notes", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ categoryId, noteId, text: nextText }),
+      });
+      if (!res.ok) throw new Error();
+      setEditingNoteId(null);
+    } catch {
+      refreshCategories();
+    } finally {
+      setSavingNoteEdit(false);
     }
   };
 
@@ -1089,11 +1212,13 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
                       : prev
                   )
                 }
+                minRows={3}
+                maxRows={8}
                 placeholder="What got done? Output, blockers, decisions…"
-                className="sprint-dialog-textarea"
+                className="sprint-dialog-textarea custom-scrollbar"
                 style={{
                   borderColor: isListening
-                    ? "var(--v2-amber-400)"
+                    ? "var(--world-accent, var(--v2-amber-400))"
                     : "var(--v2-border)",
                 }}
               />
@@ -1106,6 +1231,191 @@ export default function SprintTimerCard({ onLogSaved }: SprintTimerCardProps) {
                 <p>{saveError}</p>
               </div>
             )}
+
+            {/* Quick Note */}
+            <div className="sprint-dialog-extend" style={{ marginBottom: "1.5rem" }}>
+              <div className="flex items-center justify-between w-full mb-3">
+                <span className="sprint-dialog-extend-label">Add to Notes</span>
+                {noteSuccess && (
+                  <span className="text-xs flex items-center gap-1" style={{ color: "var(--world-accent, var(--v2-sage-400))", fontWeight: 600 }}>
+                    <CheckCircle2 className="w-3.5 h-3.5"/> Added
+                  </span>
+                )}
+              </div>
+              <div className="flex flex-col gap-2 w-full">
+                {/* Category Selector */}
+                <div className="relative group w-full">
+                  <select
+                    value={quickNoteCategory || sprint.category}
+                    onChange={(e) => setQuickNoteCategory(e.target.value)}
+                    className="w-full bg-transparent outline-none appearance-none transition-colors"
+                    style={{ 
+                      border: "1px solid var(--v2-border)", 
+                      borderRadius: "0.5rem",
+                      padding: "0.625rem 2.5rem 0.625rem 1rem",
+                      fontSize: "0.875rem",
+                      color: "var(--v2-text-primary)",
+                      cursor: "pointer"
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = "var(--world-accent, var(--v2-amber-500))"}
+                    onBlur={(e) => e.target.style.borderColor = "var(--v2-border)"}
+                    disabled={isAddingNote || isSaving}
+                  >
+                    {categories.map((c) => (
+                      <option key={c.name} value={c.name} style={{ background: "var(--v2-obsidian-900)" }}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 pointer-events-none transition-colors" style={{ color: "var(--v2-text-muted)" }} />
+                </div>
+
+                {/* Note Input */}
+                <div className="relative group w-full">
+                  <TextareaAutosize
+                    placeholder="Capture a next step..."
+                    value={quickNoteText}
+                    onChange={(e) => setQuickNoteText(e.target.value)}
+                    disabled={isAddingNote || isSaving}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleAddQuickNote();
+                      }
+                    }}
+                    minRows={1}
+                    maxRows={5}
+                    className="w-full bg-transparent transition-colors outline-none focus-visible:ring-0 shadow-none custom-scrollbar"
+                    style={{ 
+                      border: "1px solid var(--v2-border)", 
+                      borderRadius: "0.5rem",
+                      padding: "0.5rem 2.5rem 0.5rem 1rem",
+                      fontSize: "0.875rem",
+                      lineHeight: "1.5",
+                      color: "var(--v2-text-primary)",
+                      resize: "none",
+                      overflowY: "auto",
+                      margin: 0,
+                      display: "block"
+                    }}
+                    onFocus={(e) => e.target.style.borderColor = "var(--world-accent, var(--v2-amber-500))"}
+                    onBlur={(e) => e.target.style.borderColor = "var(--v2-border)"}
+                  />
+                  <button
+                    type="button"
+                    disabled={!quickNoteText.trim() || isAddingNote || isSaving}
+                    onClick={handleAddQuickNote}
+                    className="absolute right-2 top-[5px] rounded flex items-center justify-center transition-all disabled:opacity-50"
+                    style={{
+                      height: "26px",
+                      width: "26px",
+                      background: !quickNoteText.trim() ? "transparent" : "var(--world-accent, var(--v2-amber-500))",
+                      color: !quickNoteText.trim() ? "var(--v2-text-muted)" : "var(--v2-obsidian-900)"
+                    }}
+                  >
+                    {isAddingNote ? <Loader2 className="w-3.5 h-3.5 animate-spin"/> : <Plus className="w-4 h-4" />}
+                  </button>
+                </div>
+
+                {sortedNotes.length > 0 && activeCategoryId && (
+                  <div className="catnotes-modal-list mt-2 custom-scrollbar" style={{ maxHeight: "150px", overflowY: "auto", borderTop: "1px solid var(--v2-border)", paddingTop: "0.75rem", gap: "0.5rem" }}>
+                    {sortedNotes.map((note) => (
+                      <div
+                        key={note._id}
+                        className={`catnotes-modal-item ${note.done ? "done" : ""} ${editingNoteId === note._id ? "editing" : ""}`}
+                        style={{ padding: "0.5rem", borderRadius: "0.5rem", background: "var(--v2-surface-raised)" }}
+                      >
+                        <button
+                          type="button"
+                          className="catnotes-checkbox"
+                          onClick={() => handleToggleNote(activeCategoryId, note._id!, !note.done)}
+                        >
+                          {note.done ? (
+                            <CheckCircle2
+                              className="w-4 h-4"
+                              style={{ color: "var(--world-accent, var(--v2-amber-500))" }}
+                            />
+                          ) : (
+                            <Circle
+                              className="w-4 h-4"
+                              style={{ color: "var(--v2-text-muted)" }}
+                            />
+                          )}
+                        </button>
+                        {editingNoteId === note._id ? (
+                          <TextareaAutosize
+                            value={editingNoteValue}
+                            onChange={(e) => setEditingNoteValue(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter" && !e.shiftKey) {
+                                e.preventDefault();
+                                void handleSaveEditNote(activeCategoryId, note._id!);
+                              }
+                              if (e.key === "Escape") {
+                                setEditingNoteId(null);
+                                setEditingNoteValue("");
+                              }
+                            }}
+                            minRows={1}
+                            maxRows={5}
+                            className="catnotes-modal-input flex-1 min-w-0 custom-scrollbar"
+                            style={{ resize: "none", overflowY: "auto", background: "transparent" }}
+                            disabled={savingNoteEdit}
+                            autoFocus
+                          />
+                        ) : (
+                          <span
+                            className={`catnotes-modal-text ${note.done ? "done" : ""}`}
+                            style={{ color: note.done ? "var(--v2-text-muted)" : "var(--v2-text-primary)", flex: 1, textDecoration: note.done ? "line-through" : "none", fontSize: "0.875rem" }}
+                          >
+                            {note.text}
+                          </span>
+                        )}
+                        {editingNoteId === note._id ? (
+                          <button
+                            type="button"
+                            className="catnotes-modal-delete"
+                            onClick={() => void handleSaveEditNote(activeCategoryId, note._id!)}
+                            disabled={savingNoteEdit}
+                            aria-label="Save note"
+                            title="Save note"
+                          >
+                            {savingNoteEdit ? (
+                              <Loader2 className="w-4 h-4 animate-spin text-muted" />
+                            ) : (
+                              <Check className="w-4 h-4 text-muted" />
+                            )}
+                          </button>
+                        ) : (
+                          <button
+                            type="button"
+                            className="catnotes-modal-delete hover:text-white transition-colors"
+                            onClick={() => {
+                              setEditingNoteId(note._id || null);
+                              setEditingNoteValue(note.text);
+                            }}
+                            aria-label="Edit note"
+                            title="Edit note"
+                            style={{ color: "var(--v2-text-muted)" }}
+                          >
+                            <Pencil className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          className="catnotes-modal-delete hover:text-red-400 transition-colors"
+                          onClick={() => handleDeleteNote(activeCategoryId, note._id!)}
+                          disabled={editingNoteId === note._id && savingNoteEdit}
+                          style={{ color: "var(--v2-text-muted)" }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
 
             {/* Need more time */}
             <div className="sprint-dialog-extend">

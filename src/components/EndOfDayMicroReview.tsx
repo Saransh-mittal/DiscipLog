@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { MoonStar, Trophy, Zap } from "lucide-react";
 import ChatMarkdown from "@/components/ChatMarkdown";
+import WorldCard from "@/components/WorldCard";
 import { useLogs } from "@/components/LogsProvider";
 import { getDateKeyInTimezone } from "@/lib/logs";
 
@@ -94,8 +95,8 @@ export default function EndOfDayMicroReview() {
 
   return (
     <section className="v2-stagger-in v2-stagger-5">
-      <div
-        className="world-card relative overflow-hidden border p-6 md:p-7"
+      <WorldCard
+        className="relative overflow-hidden p-6 md:p-7"
         style={{
           background:
             "radial-gradient(circle at top right, color-mix(in oklch, var(--world-accent) 10%, transparent), transparent 34%), radial-gradient(circle at bottom left, oklch(0.62 0.08 255 / 9%), transparent 32%), var(--world-surface, var(--v2-surface))",
@@ -108,10 +109,10 @@ export default function EndOfDayMicroReview() {
               style={{
                 borderColor: isUnlocked
                   ? "color-mix(in oklch, var(--world-accent) 22%, transparent)"
-                  : "oklch(1 0 0 / 10%)",
+                  : "var(--world-border, oklch(1 0 0 / 10%))",
                 background: isUnlocked
                   ? "color-mix(in oklch, var(--world-accent) 12%, transparent)"
-                  : "oklch(1 0 0 / 4%)",
+                  : "var(--world-surface-raised, oklch(1 0 0 / 4%))",
                 color: isUnlocked
                   ? "var(--world-accent)"
                   : "var(--world-text-muted, var(--v2-text-muted))",
@@ -142,8 +143,8 @@ export default function EndOfDayMicroReview() {
             <div
               className="rounded-2xl border px-3 py-2 text-sm"
               style={{
-                borderColor: "oklch(1 0 0 / 8%)",
-                background: "oklch(1 0 0 / 3%)",
+                borderColor: "var(--world-border, oklch(1 0 0 / 8%))",
+                background: "var(--world-surface-raised, oklch(1 0 0 / 3%))",
               }}
             >
               <div
@@ -157,8 +158,8 @@ export default function EndOfDayMicroReview() {
             <div
               className="rounded-2xl border px-3 py-2 text-sm"
               style={{
-                borderColor: "oklch(1 0 0 / 8%)",
-                background: "oklch(1 0 0 / 3%)",
+                borderColor: "var(--world-border, oklch(1 0 0 / 8%))",
+                background: "var(--world-surface-raised, oklch(1 0 0 / 3%))",
               }}
             >
               <div
@@ -176,9 +177,9 @@ export default function EndOfDayMicroReview() {
           <div
             className="rounded-3xl border px-5 py-5"
             style={{
-              borderColor: "oklch(1 0 0 / 8%)",
+              borderColor: "var(--world-border, oklch(1 0 0 / 8%))",
               background:
-                "linear-gradient(135deg, oklch(1 0 0 / 3%), transparent)",
+                "linear-gradient(135deg, var(--world-surface-raised, oklch(1 0 0 / 3%)), transparent)",
             }}
           >
             <div className="flex items-start gap-3">
@@ -207,9 +208,9 @@ export default function EndOfDayMicroReview() {
           <div
             className="rounded-3xl border px-5 py-5"
             style={{
-              borderColor: "oklch(1 0 0 / 8%)",
+              borderColor: "var(--world-border, oklch(1 0 0 / 8%))",
               background:
-                "linear-gradient(135deg, oklch(1 0 0 / 3%), transparent)",
+                "linear-gradient(135deg, var(--world-surface-raised, oklch(1 0 0 / 3%)), transparent)",
             }}
           >
             <div className="flex items-start gap-3">
@@ -238,10 +239,10 @@ export default function EndOfDayMicroReview() {
           <div
             className="rounded-[28px] border p-5 md:p-6"
             style={{
-              borderColor: "oklch(1 0 0 / 8%)",
+              borderColor: "var(--world-border, oklch(1 0 0 / 8%))",
               background:
-                "linear-gradient(180deg, oklch(0.14 0.008 250 / 96%), oklch(0.11 0.006 250 / 98%))",
-              boxShadow: "inset 0 1px 0 oklch(1 0 0 / 4%)",
+                "linear-gradient(180deg, var(--world-surface-raised, oklch(0.14 0.008 250 / 96%)), var(--world-surface, oklch(0.11 0.006 250 / 98%)))",
+              boxShadow: "inset 0 1px 0 color-mix(in oklch, var(--world-accent, oklch(1 0 0)) 4%, transparent)",
             }}
           >
             {isLoading && (
@@ -264,7 +265,7 @@ export default function EndOfDayMicroReview() {
             )}
           </div>
         )}
-      </div>
+      </WorldCard>
     </section>
   );
 }
